@@ -12,42 +12,50 @@ public class EnemyManager {
 
     private final List<Enemy> enemies = new ArrayList<>();
 
-    // Horda por kills
-    private int   hordaNumber      = 1;
-    private int   killsThisHorda   = 0;
-    private int   killsToNextHorda = 15;   // kills necessários para avançar
-    private int   maxOnScreen      = 8;    // inimigos simultâneos no início
+    // horda
+    private int hordaNumber      = 1;
+    private int killsThisHorda   = 0;
+    private int killsToNextHorda = 15;
     private static final int MAX_ON_SCREEN_CAP = 40;
+    private int   maxOnScreen    = 8;
 
-    // Spawn
+    // spawn
     private float spawnTimer    = 0f;
-    private float spawnInterval = 2.0f;    // segundos entre spawns
+    private float spawnInterval = 2.0f;
 
-    // Pausa entre hordas
-    private boolean inBreak     = false;
-    private float   breakTimer  = 0f;
+    // pausa entre hordas
+    private boolean inBreak    = false;
+    private float   breakTimer = 0f;
     private static final float BREAK_DURATION = 3.0f;
 
-    // Tipo predominante
-    private int   lastHordaType = -1;
-    private float gameTime      = 0f;
+    // callback
+    private int lastHordaType = -1;
     private Consumer<Integer> onHordaChange;
 
-    public void setOnHordaChange(Consumer<Integer> cb) { this.onHordaChange = cb; }
+    public void setOnHordaChange(Consumer<Integer> cb) {
+        this.onHordaChange = cb;
+    }
 
-    // Update
+    public static int killsRequired(int horda) {
+        if (horda == 1) return 15;
+        // kills(h) = kills(h-1) + 10 + (h-2)*5
+        return killsRequired(horda - 1) + 10 + (horda - 2) * 5;
+    }
+
     public void update(float dt, float playerX, float playerY,
                        float gameTimeSec) {
-        this.gameTime = gameTimeSec;
 
-        // Conta kills desta horda
-        int newKills = 0;
+        // Remove mortos e conta kills desta horda
+        List<Enemy> toRemove = new ArrayList<>();
         for (Enemy e : enemies) {
-            if (e.isDead() && !e.isXpAwarded()) newKills++;
+            if (e.isDead() && !e.isXpAwarded()) {
+                toRemove.add(e);
+                killsThisHorda++;
+            }
         }
-        killsThisHorda += newKills;
-
+        enemies.removeAll(toRemove);
         enemies.removeIf(Enemy::isDead);
+
         for (Enemy e : enemies) e.update(dt, playerX, playerY);
 
         // Pausa entre hordas
@@ -57,10 +65,10 @@ public class EnemyManager {
                 inBreak = false;
                 advanceHorda();
             }
-            return; // não spawna durante a pausa
+            return;
         }
 
-        // Verificar se horda foi concluída
+        // Avanca horda se matou o suficiente
         if (killsThisHorda >= killsToNextHorda) {
             killsThisHorda = 0;
             inBreak        = true;
@@ -68,7 +76,7 @@ public class EnemyManager {
             return;
         }
 
-        // Spawn normal
+        // Spawn
         spawnTimer += dt;
         float effectiveInterval =
                 spawnInterval * DifficultySettings.spawnIntervalMult();
@@ -79,24 +87,21 @@ public class EnemyManager {
         }
     }
 
-    // Avança para a próxima horda
     private void advanceHorda() {
         hordaNumber++;
+        killsToNextHorda = killsRequired(hordaNumber);
 
-        // Kills necessários cresce ~30% por horda
-        killsToNextHorda = (int)(killsToNextHorda * 1.3f);
-
-        // Mais inimigos simultâneos a cada 2 hordas
+        // Mais inimigos simultaneos a cada 2 hordas
         if (hordaNumber % 2 == 0) {
             maxOnScreen = Math.min(maxOnScreen + 3, MAX_ON_SCREEN_CAP);
         }
 
-        // Spawn mais rápido a cada 3 hordas
+        // Spawn mais rapido a cada 3 hordas
         if (hordaNumber % 3 == 0) {
             spawnInterval = Math.max(0.6f, spawnInterval - 0.2f);
         }
 
-        // Notifica mudança de tipo predominante
+        // Notifica mudanca de tipo predominante
         int maxType = Math.min(4, (hordaNumber - 1) / 2);
         int newType = (hordaNumber - 1) % (maxType + 1);
         if (newType != lastHordaType) {
@@ -105,23 +110,16 @@ public class EnemyManager {
         }
     }
 
-    // Spawna um lote de inimigos
     private void spawnBatch(float px, float py) {
-        // Quantos podemos ainda colocar na tela
-        int slots = maxOnScreen - enemies.size();
+        int slots     = maxOnScreen - enemies.size();
         if (slots <= 0) return;
-
-        // Por horda avançada spawna mais de uma vez por tick
         int batchSize = Math.min(slots, 1 + hordaNumber / 5);
-
-        // Tipos disponíveis crescem com a horda
-        int maxType = Math.min(4, (hordaNumber - 1) / 2);
+        int maxType   = Math.min(4, (hordaNumber - 1) / 2);
+        int dominant  = (hordaNumber - 1) % (maxType + 1);
 
         for (int i = 0; i < batchSize; i++) {
-            // Bias para o tipo predominante da horda (70% chance)
-            int predominant = (hordaNumber - 1) % (maxType + 1);
             int type = (Math.random() < 0.70)
-                    ? predominant
+                    ? dominant
                     : (int)(Math.random() * (maxType + 1));
 
             float angle  = (float)(Math.random() * Math.PI * 2);
@@ -132,18 +130,16 @@ public class EnemyManager {
         }
     }
 
-    // Draw
     public void draw(Graphics2D g2, int camX, int camY) {
         for (Enemy e : enemies) e.draw(g2, camX, camY);
     }
 
-    // Getters
-    public List<Enemy> getEnemies()     { return enemies; }
-    public int         getHordaNumber() { return hordaNumber; }
+    public List<Enemy> getEnemies()          { return enemies; }
+    public int         getHordaNumber()      { return hordaNumber; }
     public int         getKillsThisHorda()   { return killsThisHorda; }
     public int         getKillsToNextHorda() { return killsToNextHorda; }
-    public boolean     isInBreak()      { return inBreak; }
-    public float       getBreakTimer()  { return breakTimer; }
+    public boolean     isInBreak()           { return inBreak; }
+    public float       getBreakTimer()       { return breakTimer; }
 
     public void clear() {
         enemies.clear();

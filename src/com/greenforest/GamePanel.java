@@ -6,13 +6,16 @@ import com.greenforest.entity.Player;
 import com.greenforest.manager.BossManager;
 import com.greenforest.manager.EnemyManager;
 import com.greenforest.manager.ProjectileManager;
+import com.greenforest.powerup.PowerUp;
 import com.greenforest.ui.EducationalOverlay;
 import com.greenforest.ui.HUD;
+import com.greenforest.ui.PowerUpScreen;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
 import java.util.HashSet;
+import java.util.Random;
 import java.util.Set;
 
 public class GamePanel extends JPanel
@@ -51,6 +54,13 @@ public class GamePanel extends JPanel
     private BossManager       bossManager;
     private HUD               hud;
     private EducationalOverlay overlay;
+    private PowerUpScreen     powerUpScreen;
+
+    // RNG
+    private final Random rng = new Random();
+
+    // Tick counter (para animacoes da PowerUpScreen)
+    private long tickCount = 0;
 
     // Camera
     private int camX, camY;
@@ -116,8 +126,9 @@ public class GamePanel extends JPanel
         addMouseMotionListener(this);
         setBackground(Color.BLACK);
 
-        overlay = new EducationalOverlay();
-        hud     = new HUD();
+        overlay      = new EducationalOverlay();
+        hud          = new HUD();
+        powerUpScreen = new PowerUpScreen();
 
         generateBuildings();
         generateBgBuildings();
@@ -133,12 +144,11 @@ public class GamePanel extends JPanel
         int slotW = WORLD_W / BUILDING_COUNT;
         for (int i = 0; i < BUILDING_COUNT; i++) {
             seed = lcg(seed);
-            // x dentro do slot, com variacao
             int bx = i * slotW + (int)(seed % slotW);
             seed = lcg(seed);
-            int bw = 90 + (int)(seed % 150);   // 90-240
+            int bw = 90 + (int)(seed % 150);
             seed = lcg(seed);
-            int bh = 130 + (int)(seed % 270);  // 130-400
+            int bh = 130 + (int)(seed % 270);
             seed = lcg(seed);
             int colorIdx     = (int)(seed % BUILDING_COLORS.length);
             seed = lcg(seed);
@@ -165,9 +175,9 @@ public class GamePanel extends JPanel
             seed = lcg(seed);
             int bx = i * slotW + (int)(seed % slotW);
             seed = lcg(seed);
-            int bw = 60 + (int)(seed % 120);   // 60-180
+            int bw = 60 + (int)(seed % 120);
             seed = lcg(seed);
-            int bh = 60 + (int)(seed % 140);   // 60-200
+            int bh = 60 + (int)(seed % 140);
             seed = lcg(seed);
             int colorIdx   = (int)(seed % BG_BUILDING_COLORS.length);
             seed = lcg(seed);
@@ -188,7 +198,7 @@ public class GamePanel extends JPanel
             seed = lcg(seed);
             int ex   = i * slotW + (int)(seed % slotW);
             seed = lcg(seed);
-            int tipo = (int)(seed % 6); // 0-5
+            int tipo = (int)(seed % 6);
             streetElems[i][0] = ex;
             streetElems[i][1] = tipo;
         }
@@ -199,7 +209,9 @@ public class GamePanel extends JPanel
         enemyManager      = new EnemyManager();
         projectileManager = new ProjectileManager();
         bossManager       = new BossManager();
+        powerUpScreen     = new PowerUpScreen();
         gameTimeSec       = 0f;
+        tickCount         = 0;
         manualMode        = modeSelection == 1;
 
         hud.setAttackMode(manualMode);
@@ -223,9 +235,15 @@ public class GamePanel extends JPanel
         if (msg != null) overlay.showHordaMessage(msg);
     }
 
+    // -------------------------------------------------------------------------
+    // UPDATE
+    // -------------------------------------------------------------------------
+
     public void update(float dt) {
+        tickCount++;
         switch (state) {
             case PLAYING     -> updatePlaying(dt);
+            case POWER_UP    -> updatePowerUp();
             case PAUSED      -> {}
             case BOSS_LESSON -> {}
             case GAME_OVER   -> {}
@@ -248,7 +266,8 @@ public class GamePanel extends JPanel
         lampostGlow = 0.85f + 0.15f * (float) Math.sin(lampostTimer * 3.0);
 
         // Movimento do jogador
-        float speed = 2.8f;
+        float baseSpeed = 2.8f;
+        float speed     = baseSpeed * player.getSpeedMult();
         float dx = 0, dy = 0;
         if (keysDown.contains(KeyEvent.VK_W) ||
                 keysDown.contains(KeyEvent.VK_UP))    dy -= 1;
@@ -294,6 +313,14 @@ public class GamePanel extends JPanel
                 player.addKill();
                 e.markXpAwarded();
             }
+        }
+
+        // Level up pendente -> tela de power-up
+        if (player.isLevelUpPending()) {
+            player.clearLevelUpPending();
+            powerUpScreen.setOptions(PowerUp.getRandomThree(rng));
+            state = GameState.POWER_UP;
+            return; // nao continua o update deste frame
         }
 
         // Boss
@@ -347,6 +374,18 @@ public class GamePanel extends JPanel
         overlay.update(dt);
     }
 
+    private void updatePowerUp() {
+        PowerUp chosen = powerUpScreen.getChosen();
+        if (chosen != null) {
+            player.applyPowerUp(chosen);
+            state = GameState.PLAYING;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // RENDER
+    // -------------------------------------------------------------------------
+
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
@@ -358,6 +397,7 @@ public class GamePanel extends JPanel
             case TITLE       -> drawTitle(g2);
             case PLAYING     -> drawPlaying(g2);
             case PAUSED      -> { drawPlaying(g2); drawPause(g2); }
+            case POWER_UP    -> { drawPlaying(g2); powerUpScreen.draw(g2, screenW, screenH, tickCount); }
             case BOSS_LESSON -> { drawPlaying(g2); drawBossLesson(g2); }
             case GAME_OVER   -> drawGameOver(g2);
         }
@@ -369,7 +409,8 @@ public class GamePanel extends JPanel
         bossManager.draw(g2, camX, camY);
         projectileManager.draw(g2, camX, camY);
         player.draw(g2, camX, camY);
-        hud.draw(g2, screenW, screenH, player, gameTimeSec,
+        hud.draw(g2, screenW, screenH, player, enemyManager,
+                gameTimeSec,
                 bossManager.isBossImminent(), bossManager.getTimerRatio());
         overlay.drawHordaMessage(g2, screenW, screenH);
 
@@ -385,30 +426,29 @@ public class GamePanel extends JPanel
 
     private void drawBackground(Graphics2D g2) {
         drawSky(g2);
-        drawBgBuildings(g2);   // camada de fundo (silhueta)
-        drawBuildings(g2);     // camada proxima
+        drawBgBuildings(g2);
+        drawBuildings(g2);
         drawGround(g2);
         drawStreetElements(g2);
     }
 
-    // Ceu
+    // -------------------------------------------------------------------------
+    // BACKGROUND DRAWING (identico ao original)
+    // -------------------------------------------------------------------------
 
     private void drawSky(Graphics2D g2) {
-        // Horizonte na tela
         int horizonScreenY = HORIZON_Y - camY;
         int skyBottom = Math.min(horizonScreenY, screenH);
         if (skyBottom <= 0) return;
 
-        // Gradiente do ceu noturno/entardecer urbano
         GradientPaint skyGrad = new GradientPaint(
-                0, 0,        new Color(8, 10, 22),
+                0, 0,         new Color(8, 10, 22),
                 0, skyBottom, new Color(35, 28, 55)
         );
         g2.setPaint(skyGrad);
         g2.fillRect(0, 0, screenW, skyBottom);
         g2.setPaint(null);
 
-        // Estrelas
         long s = 0xABCDEFL;
         for (int i = 0; i < 90; i++) {
             s = lcg(s);
@@ -423,7 +463,6 @@ public class GamePanel extends JPanel
             g2.fillRect(sx, sy, sz, sz);
         }
 
-        // Lua crescente no canto superior direito
         drawMoon(g2, skyBottom);
     }
 
@@ -431,47 +470,36 @@ public class GamePanel extends JPanel
         if (skyBottom < 60) return;
         int mx = screenW - 90;
         int my = 55;
-        // Halo
         g2.setColor(new Color(220, 215, 180, 18));
         g2.fillOval(mx - 22, my - 22, 76, 76);
         g2.setColor(new Color(220, 215, 180, 10));
         g2.fillOval(mx - 30, my - 30, 92, 92);
-        // Corpo da lua
         g2.setColor(new Color(240, 235, 200));
         g2.fillOval(mx, my, 32, 32);
-        // "morde" a lua para fazer crescente
         g2.setColor(new Color(8, 10, 22));
         g2.fillOval(mx + 8, my - 4, 30, 30);
     }
-
-    // Predios de fundo (silhueta, paralaxe 0.35)
 
     private void drawBgBuildings(Graphics2D g2) {
         int horizonScreenY = HORIZON_Y - camY;
         if (horizonScreenY <= 0) return;
 
         for (int[] b : bgBuildings) {
-            int bxWorld = b[0];
-            int bw      = b[1];
-            int bh      = b[2];
-            int colorIdx = b[3];
+            int bxWorld    = b[0];
+            int bw         = b[1];
+            int bh         = b[2];
+            int colorIdx   = b[3];
             int windowSeed = b[4];
 
-            // Paralaxe 0.35
             int screenX = (int)(bxWorld - camX * 0.35f);
-            // Topo do predio na tela
             int screenY = horizonScreenY - bh;
 
             if (screenX + bw < 0 || screenX > screenW) continue;
             if (screenY + bh <= 0) continue;
 
             Color base = BG_BUILDING_COLORS[colorIdx];
-
-            // Corpo
             g2.setColor(base);
             g2.fillRect(screenX, screenY, bw, bh);
-
-            // Janelas esparsas
             drawBgBuildingWindows(g2, screenX, screenY, bw, bh, windowSeed);
         }
     }
@@ -479,10 +507,10 @@ public class GamePanel extends JPanel
     private void drawBgBuildingWindows(Graphics2D g2,
                                        int bx, int by, int bw, int bh,
                                        int seed) {
-        int cols = 2;
-        int winW = 7;
-        int winH = 9;
-        int padX = (bw - cols * winW) / (cols + 1);
+        int cols   = 2;
+        int winW   = 7;
+        int winH   = 9;
+        int padX   = (bw - cols * winW) / (cols + 1);
         if (padX < 3) return;
         int gapY   = 16;
         int padTop = 12;
@@ -503,24 +531,20 @@ public class GamePanel extends JPanel
         }
     }
 
-    // Predios proximos (paralaxe 0.75)
-
     private void drawBuildings(Graphics2D g2) {
         int horizonScreenY = HORIZON_Y - camY;
         if (horizonScreenY <= 0) return;
 
         for (int[] b : buildings) {
-            int bxWorld    = b[0];
-            int bw         = b[1];
-            int bh         = b[2];
-            int colorIdx   = b[3];
-            int hasAntenna = b[4];
+            int bxWorld      = b[0];
+            int bw           = b[1];
+            int bh           = b[2];
+            int colorIdx     = b[3];
+            int hasAntenna   = b[4];
             int hasWaterTank = b[5];
-            int windowSeed = b[6];
+            int windowSeed   = b[6];
 
-            // Paralaxe 0.75 no eixo X
             int screenX = (int)(bxWorld - camX * 0.75f);
-            // Topo do predio: horizonte - altura
             int screenY = horizonScreenY - bh;
 
             if (screenX + bw < 0 || screenX > screenW) continue;
@@ -528,11 +552,9 @@ public class GamePanel extends JPanel
 
             Color base = BUILDING_COLORS[colorIdx];
 
-            // Corpo principal
             g2.setColor(base);
             g2.fillRect(screenX, screenY, bw, bh);
 
-            // Gradiente de sombra lateral
             GradientPaint shadow = new GradientPaint(
                     screenX,      screenY, new Color(0, 0, 0, 0),
                     screenX + bw, screenY, new Color(0, 0, 0, 70)
@@ -541,31 +563,24 @@ public class GamePanel extends JPanel
             g2.fillRect(screenX, screenY, bw, bh);
             g2.setPaint(null);
 
-            // Borda superior iluminada
             g2.setColor(base.brighter());
             g2.drawLine(screenX, screenY, screenX + bw, screenY);
 
-            // Fachada do terreo (loja)
             drawStorefront(g2, screenX, screenY, bw, bh, windowSeed);
-
-            // Janelas
             drawBuildingWindows(g2, screenX, screenY, bw, bh - 30, windowSeed);
 
-            // Antena
             if (hasAntenna == 1) {
                 int ax = screenX + bw / 2;
                 int ay = screenY;
                 g2.setColor(new Color(160, 162, 170));
                 g2.setStroke(new BasicStroke(2f));
                 g2.drawLine(ax, ay, ax, ay - 32);
-                // Luz pulsante
                 int glowA = (int)(lampostGlow * 200);
                 g2.setColor(new Color(255, 80, 80, glowA));
                 g2.fillOval(ax - 3, ay - 35, 6, 6);
                 g2.setStroke(new BasicStroke(1f));
             }
 
-            // Caixa d'agua
             if (hasWaterTank == 1) {
                 int tx = screenX + bw / 2 - 12;
                 int ty = screenY - 22;
@@ -583,15 +598,12 @@ public class GamePanel extends JPanel
     private void drawStorefront(Graphics2D g2,
                                 int bx, int by, int bw, int bh,
                                 int seed) {
-        // Terreo ocupa os ultimos 30px do predio
         int ty = by + bh - 30;
         int th = 30;
 
-        // Fundo levemente mais claro
         g2.setColor(new Color(60, 58, 55));
         g2.fillRect(bx, ty, bw, th);
 
-        // Vitrine
         int vw = Math.min(bw - 16, 50);
         int vx = bx + (bw - vw) / 2;
         g2.setColor(new Color(140, 200, 220, 80));
@@ -599,21 +611,18 @@ public class GamePanel extends JPanel
         g2.setColor(new Color(180, 220, 240, 140));
         g2.drawRect(vx, ty + 4, vw, th - 8);
 
-        // Toldo colorido
         Color[] awningColors = {
-                new Color(180, 50, 50),
-                new Color(50, 100, 180),
-                new Color(50, 150, 60),
+                new Color(180, 50,  50),
+                new Color(50,  100, 180),
+                new Color(50,  150, 60),
                 new Color(160, 120, 40),
         };
         Color awning = awningColors[seed % awningColors.length];
         g2.setColor(awning);
         g2.fillRect(vx - 4, ty, vw + 8, 8);
-        // Listras do toldo
         g2.setColor(new Color(255, 255, 255, 60));
-        for (int sx = vx - 4; sx < vx + vw + 8; sx += 8) {
+        for (int sx = vx - 4; sx < vx + vw + 8; sx += 8)
             g2.fillRect(sx, ty, 4, 8);
-        }
     }
 
     private void drawBuildingWindows(Graphics2D g2,
@@ -649,15 +658,12 @@ public class GamePanel extends JPanel
         }
     }
 
-    // Chao
-
     private void drawGround(Graphics2D g2) {
         int groundScreenY = HORIZON_Y - camY;
         if (groundScreenY > screenH) return;
         if (groundScreenY < 0) groundScreenY = 0;
         int groundH = screenH - groundScreenY;
 
-        // Asfalto
         GradientPaint asphalt = new GradientPaint(
                 0, groundScreenY,           new Color(38, 40, 43),
                 0, groundScreenY + groundH, new Color(28, 30, 33)
@@ -666,7 +672,6 @@ public class GamePanel extends JPanel
         g2.fillRect(0, groundScreenY, screenW, groundH);
         g2.setPaint(null);
 
-        // Calcadas
         int sidewalkH = 55;
         g2.setColor(new Color(105, 103, 96));
         g2.fillRect(0, groundScreenY, screenW, sidewalkH);
@@ -674,19 +679,14 @@ public class GamePanel extends JPanel
         if (lowerY > groundScreenY + sidewalkH)
             g2.fillRect(0, lowerY, screenW, sidewalkH);
 
-        // Ladrilhos
         drawSidewalkTiles(g2, groundScreenY, sidewalkH);
         if (lowerY > groundScreenY + sidewalkH)
             drawSidewalkTiles(g2, lowerY, sidewalkH);
 
-        // Linha central tracejada
         int roadCenterY = groundScreenY + groundH / 2;
         drawDashedLine(g2, roadCenterY);
-
-        // Faixas de pedestres
         drawCrosswalks(g2, groundScreenY, groundH);
 
-        // Meio-fio
         g2.setColor(new Color(18, 18, 18, 170));
         g2.fillRect(0, groundScreenY + sidewalkH - 3, screenW, 3);
         if (lowerY > groundScreenY + sidewalkH)
@@ -719,9 +719,9 @@ public class GamePanel extends JPanel
     }
 
     private void drawCrosswalks(Graphics2D g2, int groundScreenY, int groundH) {
-        int spacing  = 400;
-        int cwWidth  = 80;
-        int stripeW  = 12;
+        int spacing   = 400;
+        int cwWidth   = 80;
+        int stripeW   = 12;
         int stripeGap = 8;
         int offX = camX % spacing;
         Color stripeColor = crosswalkWhite
@@ -744,7 +744,6 @@ public class GamePanel extends JPanel
             int worldX = elem[0];
             int tipo   = elem[1];
 
-            // Paralaxe 1:1 (igual ao chao)
             int screenX = worldX - camX;
             if (screenX < -80 || screenX > screenW + 80) continue;
 
@@ -760,106 +759,86 @@ public class GamePanel extends JPanel
     }
 
     private void drawLamppost(Graphics2D g2, int x, int groundY) {
-        int baseY = groundY + 48; // pe do poste na calcada
+        int baseY = groundY + 48;
 
-        // Halo de luz no chao
         int haloA = (int)(lampostGlow * 35);
         g2.setColor(new Color(255, 230, 120, haloA));
         g2.fillOval(x - 30, groundY + 44, 60, 16);
 
-        // Mastro
         g2.setColor(new Color(130, 132, 138));
         g2.setStroke(new BasicStroke(3f));
         g2.drawLine(x, baseY, x, baseY - 70);
         g2.setStroke(new BasicStroke(1f));
 
-        // Braco horizontal
         g2.setColor(new Color(120, 122, 128));
         g2.setStroke(new BasicStroke(2.5f));
         g2.drawLine(x, baseY - 70, x + 14, baseY - 70);
         g2.setStroke(new BasicStroke(1f));
 
-        // Luminaria (caixinha)
         g2.setColor(new Color(80, 82, 88));
         g2.fillRect(x + 6, baseY - 75, 16, 8);
 
-        // Luz
         int glowA = (int)(lampostGlow * 230);
         g2.setColor(new Color(255, 240, 160, glowA));
         g2.fillRect(x + 8, baseY - 73, 12, 5);
 
-        // Halo da luminaria
         g2.setColor(new Color(255, 230, 120, (int)(lampostGlow * 45)));
         g2.fillOval(x + 2, baseY - 82, 28, 22);
 
-        // Base do poste (quadrado no chao)
         g2.setColor(new Color(100, 102, 108));
         g2.fillRect(x - 4, baseY - 4, 8, 8);
     }
 
     private void drawTrashCan(Graphics2D g2, int x, int groundY) {
-        int by = groundY + 30; // topo da lixeira
+        int by = groundY + 30;
 
-        // Corpo
         g2.setColor(new Color(40, 100, 50));
         g2.fillRoundRect(x - 10, by, 20, 24, 4, 4);
 
-        // Aro superior
         g2.setColor(new Color(30, 75, 38));
         g2.fillRect(x - 11, by, 22, 5);
 
-        // Tampa
         g2.setColor(new Color(50, 120, 60));
         g2.fillRoundRect(x - 12, by - 5, 24, 7, 3, 3);
 
-        // Logo reciclagem (3 setas simplificadas)
         g2.setColor(new Color(180, 230, 180, 180));
         g2.setStroke(new BasicStroke(1.5f));
         g2.drawOval(x - 5, by + 7, 10, 10);
         g2.setStroke(new BasicStroke(1f));
 
-        // Perna / base
         g2.setColor(new Color(60, 60, 65));
         g2.fillRect(x - 3, by + 24, 6, 6);
     }
 
-
     private void drawHydrant(Graphics2D g2, int x, int groundY) {
-        int by = groundY + 36; // topo do hidrante
+        int by = groundY + 36;
 
-        // Corpo principal
         g2.setColor(new Color(180, 40, 40));
         g2.fillRoundRect(x - 7, by, 14, 18, 4, 4);
 
-        // Cabeca arredondada
         g2.setColor(new Color(200, 50, 50));
         g2.fillOval(x - 7, by - 6, 14, 12);
         g2.setColor(new Color(160, 30, 30));
         g2.fillOval(x - 4, by - 3, 8, 6);
 
-        // Saidas laterais
         g2.setColor(new Color(160, 35, 35));
         g2.fillRect(x - 12, by + 4, 5, 5);
-        g2.fillRect(x + 7, by + 4, 5, 5);
+        g2.fillRect(x + 7,  by + 4, 5, 5);
 
-        // Parafusos nas saidas
         g2.setColor(new Color(120, 120, 80));
         g2.fillOval(x - 11, by + 5, 3, 3);
         g2.fillOval(x + 8,  by + 5, 3, 3);
 
-        // Base
         g2.setColor(new Color(140, 30, 30));
         g2.fillRect(x - 9, by + 16, 18, 4);
     }
 
     private void drawNewsstand(Graphics2D g2, int x, int groundY) {
-        int by = groundY + 10; // topo da banca
+        int by = groundY + 10;
 
-        // Estrutura principal
         g2.setColor(new Color(60, 80, 110));
         g2.fillRect(x - 20, by, 40, 44);
 
-        // Teto inclinado
         int[] txs = {x - 24, x + 24, x + 20, x - 20};
         int[] tys = {by - 2,  by - 2,  by,     by};
         g2.setColor(new Color(40, 60, 90));
@@ -867,10 +846,8 @@ public class GamePanel extends JPanel
         g2.setColor(new Color(80, 110, 150));
         g2.drawLine(x - 24, by - 2, x + 24, by - 2);
 
-        // Vitrine
         g2.setColor(new Color(220, 215, 200, 180));
         g2.fillRect(x - 16, by + 6, 32, 20);
-        // Jornais coloridos
         g2.setColor(new Color(200, 60, 60, 200));
         g2.fillRect(x - 15, by + 7, 14, 8);
         g2.setColor(new Color(60, 120, 200, 200));
@@ -878,15 +855,12 @@ public class GamePanel extends JPanel
         g2.setColor(new Color(60, 160, 80, 200));
         g2.fillRect(x - 15, by + 16, 30, 8);
 
-        // Grade
         g2.setColor(new Color(30, 48, 70));
         g2.drawRect(x - 16, by + 6, 32, 20);
 
-        // Balcao
         g2.setColor(new Color(80, 68, 55));
         g2.fillRect(x - 22, by + 30, 44, 6);
 
-        // Pe
         g2.setColor(new Color(50, 50, 55));
         g2.fillRect(x - 18, by + 36, 36, 8);
     }
@@ -895,49 +869,37 @@ public class GamePanel extends JPanel
         int trunkBaseY = groundY + 52;
         int trunkH     = 36;
 
-        // Raiz/base
         g2.setColor(new Color(60, 45, 30));
         g2.fillRect(x - 6, trunkBaseY - 4, 12, 4);
 
-        // Tronco
         g2.setColor(new Color(80, 58, 35));
         g2.fillRect(x - 5, trunkBaseY - trunkH, 10, trunkH);
 
-        // Textura do tronco
         g2.setColor(new Color(65, 45, 25));
         g2.drawLine(x - 2, trunkBaseY - trunkH + 5,
                 x - 2, trunkBaseY - 8);
         g2.drawLine(x + 2, trunkBaseY - trunkH + 10,
                 x + 2, trunkBaseY - 6);
 
-        // Copa (tres camadas para dar volume)
-        // Sombra da copa
         g2.setColor(new Color(25, 65, 25, 180));
         g2.fillOval(x - 22, trunkBaseY - trunkH - 30, 46, 38);
-        // Copa principal
         g2.setColor(new Color(35, 95, 35));
         g2.fillOval(x - 20, trunkBaseY - trunkH - 34, 40, 36);
-        // Brilho
         g2.setColor(new Color(55, 130, 50));
         g2.fillOval(x - 14, trunkBaseY - trunkH - 32, 22, 16);
-        // Destaque topo
         g2.setColor(new Color(70, 155, 60, 160));
         g2.fillOval(x - 8, trunkBaseY - trunkH - 36, 14, 10);
     }
 
     private void drawManhole(Graphics2D g2, int x, int groundY) {
-        // Fica no meio do asfalto, abaixo das calcadas
-        int my = groundY + 100; // no asfalto
+        int my = groundY + 100;
 
-        // Aro externo
         g2.setColor(new Color(55, 55, 58));
         g2.fillOval(x - 14, my - 6, 28, 14);
 
-        // Tampa
         g2.setColor(new Color(48, 48, 50));
         g2.fillOval(x - 12, my - 5, 24, 12);
 
-        // Padrao gradeado (linhas cruzadas)
         g2.setColor(new Color(38, 38, 40));
         g2.setStroke(new BasicStroke(0.8f));
         g2.drawLine(x - 8, my - 2, x + 8, my - 2);
@@ -947,10 +909,13 @@ public class GamePanel extends JPanel
         g2.drawLine(x + 4, my - 4, x + 4, my + 4);
         g2.setStroke(new BasicStroke(1f));
 
-        // Anel interno
         g2.setColor(new Color(42, 42, 44));
         g2.drawOval(x - 10, my - 4, 20, 10);
     }
+
+    // -------------------------------------------------------------------------
+    // UI SCREENS
+    // -------------------------------------------------------------------------
 
     private void drawTitle(Graphics2D g2) {
         g2.setColor(new Color(10, 30, 10));
@@ -972,9 +937,9 @@ public class GamePanel extends JPanel
             drawTitleSection(g2, "ESCOLHA A DIFICULDADE:", 195);
             String[] diffs   = {"FACIL", "NORMAL", "DIFICIL"};
             Color[]  dColors = {
-                    new Color(80, 200, 80),
+                    new Color(80,  200, 80),
                     new Color(200, 200, 80),
-                    new Color(200, 80, 80)
+                    new Color(200, 80,  80)
             };
             for (int i = 0; i < diffs.length; i++)
                 drawTitleOption(g2, diffs[i],
@@ -1053,7 +1018,9 @@ public class GamePanel extends JPanel
         for (int i = 0; i < options.length; i++) {
             boolean sel = pauseOption == i;
             g2.setFont(new Font("Arial", Font.BOLD, sel ? 22 : 18));
-            g2.setColor(sel ? new Color(80, 255, 80) : new Color(160, 160, 160));
+            g2.setColor(sel
+                    ? new Color(80, 255, 80)
+                    : new Color(160, 160, 160));
             fm = g2.getFontMetrics();
             String label = sel ? "> " + options[i] + " <" : options[i];
             g2.drawString(label,
@@ -1136,6 +1103,10 @@ public class GamePanel extends JPanel
                 cx - fm.stringWidth(restartHint) / 2, by + boxH + 48);
     }
 
+    // -------------------------------------------------------------------------
+    // INPUT
+    // -------------------------------------------------------------------------
+
     @Override
     public void keyPressed(KeyEvent e) {
         keysDown.add(e.getKeyCode());
@@ -1144,6 +1115,7 @@ public class GamePanel extends JPanel
             case TITLE       -> handleTitleKey(k);
             case PLAYING     -> handlePlayingKey(k);
             case PAUSED      -> handlePauseKey(k);
+            case POWER_UP    -> handlePowerUpKey(k);
             case BOSS_LESSON -> {
                 if (k == KeyEvent.VK_ENTER) {
                     pendingBossLesson = null;
@@ -1153,7 +1125,10 @@ public class GamePanel extends JPanel
             }
             case GAME_OVER -> {
                 if (k == KeyEvent.VK_R) { titlePhase = 0; startGame(); }
-                else if (k == KeyEvent.VK_M) { titlePhase = 0; state = GameState.TITLE; }
+                else if (k == KeyEvent.VK_M) {
+                    titlePhase = 0;
+                    state = GameState.TITLE;
+                }
             }
         }
     }
@@ -1207,11 +1182,24 @@ public class GamePanel extends JPanel
         }
     }
 
-    @Override public void keyReleased(KeyEvent e) { keysDown.remove(e.getKeyCode()); }
-    @Override public void keyTyped(KeyEvent e)    {}
+    private void handlePowerUpKey(int k) {
+        if (k == KeyEvent.VK_LEFT)  powerUpScreen.moveLeft();
+        if (k == KeyEvent.VK_RIGHT) powerUpScreen.moveRight();
+        if (k == KeyEvent.VK_ENTER) powerUpScreen.confirm();
+    }
+
+    @Override
+    public void keyReleased(KeyEvent e) { keysDown.remove(e.getKeyCode()); }
+
+    @Override
+    public void keyTyped(KeyEvent e) {}
 
     @Override
     public void mousePressed(MouseEvent e) {
+        if (state == GameState.POWER_UP) {
+            powerUpScreen.handleClick(e.getX(), e.getY(), screenW, screenH);
+            return;
+        }
         if (state == GameState.PLAYING
                 && manualMode
                 && e.getButton() == MouseEvent.BUTTON1) {

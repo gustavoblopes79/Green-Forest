@@ -259,23 +259,8 @@ public class GamePanel extends JPanel
     }
 
     private void onHordaChange(int type) {
-        String msg = switch (type) {
-            case 0 -> "SACOLAS PLASTICAS\nLevam ate 400 anos para se decompor!";
-            case 1 -> "LATAS DE ALUMINIO\nReciclavel infinitas vezes -- separe as suas!";
-            case 2 -> "PNEUS\nLevam 600 anos para se decompor.\n"
-                    + "Acumulam agua parada -- risco de dengue!";
-            case 3 -> "NUVEM TOXICA\nPoluicao do ar causa doencas respiratorias.\n"
-                    + "Ande de bike ou a pe quando puder!";
-            case 4 -> "CIGARROS\nO filtro contem microplasticos.\n"
-                    + "Sao o item mais catado nas limpezas de praia!";
-            default -> null;
-        };
-        if (msg != null) overlay.showHordaMessage(msg);
+        overlay.showHordaLesson(enemyManager.getHordaNumber());
     }
-
-    // -------------------------------------------------------------------------
-    // UPDATE
-    // -------------------------------------------------------------------------
 
     public void update(float dt) {
         tickCount++;
@@ -335,7 +320,10 @@ public class GamePanel extends JPanel
         if (manualMode) {
             projectileManager.updateManual(dt);
         } else {
-            projectileManager.update(dt, player, enemyManager.getEnemies());
+            Boss activeBoss = bossManager.hasBoss()
+                    ? bossManager.getActiveBoss()
+                    : null;
+            projectileManager.update(dt, player, enemyManager.getEnemies(), activeBoss);
         }
         projectileManager.checkCollisions(enemyManager.getEnemies(), player);
 
@@ -365,6 +353,15 @@ public class GamePanel extends JPanel
 
             if (boss.hitsWithSpecial(player.getX(), player.getY()))
                 player.takeDamage(boss.getSpecialDamage());
+            float px = player.getX();
+            float py = player.getY();
+            int sd = (int) boss.getSecondaryDamage();
+            if (boss.hitsWithEmp(px, py))       player.takeDamage(sd);
+            if (boss.hitsWithSmoke(px, py))     player.takeDamage((int)(sd * 0.5f));
+            if (boss.hitsWithTrash(px, py))     player.takeDamage(sd);
+            if (boss.hitsWithOil(px, py))       player.takeDamage((int)(sd * 0.3f));
+            if (boss.hitsWithDash(px, py))      player.takeDamage(sd);
+            if (boss.hitsWithTentacles(px, py)) player.takeDamage((int)(sd * 0.7f));
         }
 
         // Dano de inimigos normais
@@ -383,10 +380,13 @@ public class GamePanel extends JPanel
             player.gainXP(deadBoss.getXpValue() * 3);
             player.addKill();
             pendingBossLesson = deadBoss.getLesson();
-            pendingBossName   = switch (deadBoss.getBossType()) {
-                case E_WASTE       -> "LIXO ELETRONICO";
-                case FACTORY       -> "FABRICA POLUENTE";
-                case GARBAGE_TRUCK -> "CAMINHAO DE LIXO";
+            pendingBossName = switch (deadBoss.getBossType()) {
+                case E_WASTE        -> "LIXO ELETRONICO";
+                case FACTORY        -> "FABRICA POLUENTE";
+                case GARBAGE_TRUCK  -> "CAMINHAO DE LIXO";
+                case PETROLEO       -> "PETROLEO";
+                case DESMATAMENTO   -> "DESMATAMENTO";
+                case PLASTICO_OCEANO -> "PLASTICO OCEANO";
             };
             state = GameState.BOSS_LESSON;
         }

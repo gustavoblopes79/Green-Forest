@@ -14,24 +14,46 @@ public class ProjectileManager {
     private final List<Projectile> projectiles = new ArrayList<>();
     private float attackTimer = 0f;
 
-
-    public void update(float dt, Player player, List<Enemy> enemies) {
+    /**
+     * Modo automatico: prioriza o boss se houver um ativo.
+     * Passa boss = null quando nao houver boss.
+     */
+    public void update(float dt, Player player, List<Enemy> enemies, Boss boss) {
         attackTimer += dt;
 
         if (attackTimer >= 1f / player.getAttackSpeed()) {
             attackTimer = 0f;
-            Enemy nearest = findNearest(player, enemies);
-            if (nearest != null) {
-                float dx = nearest.getX() - player.getX();
-                float dy = nearest.getY() - player.getY();
+
+            // Prioridade 1: boss ativo
+            if (boss != null && !boss.isDead()) {
+                float dx  = boss.getX() - player.getX();
+                float dy  = boss.getY() - player.getY();
                 float len = (float) Math.sqrt(dx * dx + dy * dy);
                 if (len > 0) {
                     fireProjectile(player, dx / len, dy / len);
+                }
+            } else {
+                // Prioridade 2: inimigo mais proximo
+                Enemy nearest = findNearest(player, enemies);
+                if (nearest != null) {
+                    float dx  = nearest.getX() - player.getX();
+                    float dy  = nearest.getY() - player.getY();
+                    float len = (float) Math.sqrt(dx * dx + dy * dy);
+                    if (len > 0) {
+                        fireProjectile(player, dx / len, dy / len);
+                    }
                 }
             }
         }
 
         tickProjectiles();
+    }
+
+    /**
+     * Sobrecarga de compatibilidade sem boss (delega para a versao principal).
+     */
+    public void update(float dt, Player player, List<Enemy> enemies) {
+        update(dt, player, enemies, null);
     }
 
     /**
@@ -120,6 +142,6 @@ public class ProjectileManager {
         for (Projectile p : projectiles) p.draw(g2, camX, camY);
     }
 
-    public void clear()                          { projectiles.clear(); }
-    public List<Projectile> getProjectiles()     { return projectiles; }
+    public void clear()                      { projectiles.clear(); }
+    public List<Projectile> getProjectiles() { return projectiles; }
 }

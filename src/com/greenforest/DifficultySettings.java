@@ -54,6 +54,14 @@ public class DifficultySettings {
         };
     }
 
+    public static float bossIntervalBonus() {
+        return switch (current) {
+            case EASY   -> 30f;   // +30s = 150s total
+            case NORMAL -> 0f;    // 120s base
+            case HARD   -> -15f;  // -15s = 105s total
+        };
+    }
+
     public static String label() {
         return switch (current) {
             case EASY   -> "FACIL";

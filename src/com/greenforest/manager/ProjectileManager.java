@@ -113,7 +113,6 @@ public class ProjectileManager {
                 if (dist < e.getSize() / 2f + 5f) {
                     e.takeDamage(p.getDamage());
                     p.kill();
-                    if (e.isDead()) player.addKill();
                     break;
                 }
             }
@@ -131,7 +130,6 @@ public class ProjectileManager {
             if (dist < boss.getSize() / 2f + 5f) {
                 boss.takeDamage(p.getDamage());
                 p.kill();
-                if (boss.isDead()) player.addKill();
                 break;
             }
         }

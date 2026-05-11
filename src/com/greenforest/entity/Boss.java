@@ -41,16 +41,16 @@ public class Boss extends Enemy {
 
         this.lesson = switch (type) {
             case E_WASTE ->
-                    "O lixo eletronico e o residuo que mais cresce no mundo.\n" +
-                            "Celulares, computadores e pilhas contem metais toxicos\n" +
-                            "como chumbo e mercurio. Descarte nos pontos especializados!";
+                    "O lixo eletrônico é o resíduo que mais cresce no mundo.\n" +
+                            "Celulares, computadores e pilhas contém metais tóxicos\n" +
+                            "como chumbo e mercúrio. Descarte nos pontos especializados!";
             case FACTORY ->
-                    "Fabricas sem controle lancam gases como CO2 e SO2\n" +
-                            "na atmosfera, causando chuva acida e aquecimento global.\n" +
-                            "Cobre setores sustentaveis e exija politicas de emissao zero!";
+                    "Fábricas sem controle lançam gases como CO2 e SO2\n" +
+                            "na atmosfera, causando chuva ácida e aquecimento global.\n" +
+                            "Cobre setores sustentaveis e exija políticas de emissão zero!";
             case GARBAGE_TRUCK ->
-                    "O Brasil gera mais de 80 milhoes de toneladas de\n" +
-                            "residuos por ano. Apenas 4% e reciclado.\n" +
+                    "O Brasil gera mais de 80 milhões de toneladas de\n" +
+                            "resíduos por ano. Apenas 4% é reciclado.\n" +
                             "Separe o lixo e apoie a coleta seletiva no seu bairro!";
         };
     }
@@ -151,9 +151,9 @@ public class Boss extends Enemy {
 
     private String bossTypeLabel() {
         return switch (bossType) {
-            case E_WASTE       -> "LIXO ELETRONICO";
-            case FACTORY       -> "FABRICA POLUENTE";
-            case GARBAGE_TRUCK -> "CAMINHAO DE LIXO";
+            case E_WASTE       -> "LIXO ELETRÕNICO";
+            case FACTORY       -> "FÁBRICA POLUENTE";
+            case GARBAGE_TRUCK -> "CAMINHÃO DE LIXO";
         };
     }
 

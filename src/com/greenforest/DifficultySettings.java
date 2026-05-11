@@ -5,7 +5,7 @@ public class DifficultySettings {
     public enum Difficulty {
         EASY, NORMAL, HARD
     }
-
+    public static Difficulty current() { return current; }
     private static Difficulty current = Difficulty.NORMAL;
 
     public static void set(Difficulty d) { current = d; }

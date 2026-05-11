@@ -7,10 +7,12 @@ import java.awt.*;
 public class Player extends Entity {
 
     // level / XP
+    // level / XP
     private int level         = 1;
     private int xp            = 0;
-    private int xpToNextLevel = 20;   // nivel 2 custa 20 XP
+    private int xpToNextLevel = 20;
     private boolean levelUpPending = false;
+    private static final int POWERUP_INTERVAL = 3;
 
     // stats base
     private int   kills        = 0;
@@ -75,9 +77,8 @@ public class Player extends Entity {
         if (xp >= xpToNextLevel) {
             xp -= xpToNextLevel;
             level++;
-            // proximo nivel custa 15 XP a mais
             xpToNextLevel = 20 + (level - 1) * 15;
-            levelUpPending = true;
+            if (level % POWERUP_INTERVAL == 0) levelUpPending = true;
         }
     }
 
@@ -87,16 +88,16 @@ public class Player extends Entity {
 
     public void applyPowerUp(PowerUp pu) {
         switch (pu) {
-            case MAIS_DANO      -> damageMult  *= 1.25f;
-            case MAIS_VELOCIDADE -> speedMult  *= 1.20f;
-            case CURA           -> restoreHP(40);
-            case MAIS_PROJETEIS -> extraShots++;
-            case VAMPIRISMO     -> vampHeal    += 3;
-            case ESCUDO         -> {
+            case FERTILIZANTE   -> damageMult  *= 1.25f;
+            case COMPOSTAGEM    -> speedMult   *= 1.20f;
+            case FOTOSINTESE    -> restoreHP(40);
+            case SEMENTES       -> extraShots++;
+            case BIOLOGICO      -> vampHeal    += 3;
+            case BIOFILTRO      -> {
                 maxShield += 30;
                 shield     = Math.min(shield + 30, maxShield);
             }
-            case CADENCIA       -> fireRateMult *= 1.25f;
+            case ENERGIA_SOLAR  -> fireRateMult *= 1.25f;
         }
     }
 
@@ -210,4 +211,47 @@ public class Player extends Entity {
     public float getAimDirX()        { return aimDirX; }
     public float getAimDirY()        { return aimDirY; }
     public boolean isInvincible()    { return iFrameTimer > 0f; }
+
+    public com.greenforest.SaveData toSaveData(float gameTimeSec,
+                                           int hordaNumber,
+                                           int diffOrdinal) {
+        com.greenforest.SaveData d = new com.greenforest.SaveData();
+        d.level         = this.level;
+        d.xp            = this.xp;
+        d.xpToNextLevel = this.xpToNextLevel;
+        d.kills         = this.kills;
+        d.attackDamage  = this.attackDamage;
+        d.attackSpeed   = this.attackSpeed;
+        d.damageMult    = this.damageMult;
+        d.speedMult     = this.speedMult;
+        d.fireRateMult  = this.fireRateMult;
+        d.extraShots    = this.extraShots;
+        d.vampHeal      = this.vampHeal;
+        d.shield        = this.shield;
+        d.maxShield     = this.maxShield;
+        d.hp            = this.hp;
+        d.maxHp         = this.maxHp;
+        d.gameTimeSec   = gameTimeSec;
+        d.hordaNumber   = hordaNumber;
+        d.diffOrdinal   = diffOrdinal;
+        return d;
+    }
+
+    public void loadFromSave(com.greenforest.SaveData d) {
+        this.level         = d.level;
+        this.xp            = d.xp;
+        this.xpToNextLevel = d.xpToNextLevel;
+        this.kills         = d.kills;
+        this.attackDamage  = d.attackDamage;
+        this.attackSpeed   = d.attackSpeed;
+        this.damageMult    = d.damageMult;
+        this.speedMult     = d.speedMult;
+        this.fireRateMult  = d.fireRateMult;
+        this.extraShots    = d.extraShots;
+        this.vampHeal      = d.vampHeal;
+        this.shield        = d.shield;
+        this.maxShield     = d.maxShield;
+        this.hp            = d.hp;
+        this.maxHp         = d.maxHp;
+    }
 }

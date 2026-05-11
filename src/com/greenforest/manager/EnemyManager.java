@@ -2,6 +2,7 @@ package com.greenforest.manager;
 
 import com.greenforest.DifficultySettings;
 import com.greenforest.entity.Enemy;
+import com.greenforest.entity.Player;
 
 import java.awt.*;
 import java.util.ArrayList;
@@ -38,25 +39,27 @@ public class EnemyManager {
 
     public static int killsRequired(int horda) {
         if (horda == 1) return 15;
-        // kills(h) = kills(h-1) + 10 + (h-2)*5
         return killsRequired(horda - 1) + 10 + (horda - 2) * 5;
     }
 
     public void update(float dt, float playerX, float playerY,
-                       float gameTimeSec) {
+                       float gameTimeSec, Player player) {
 
-        // Remove mortos e conta kills desta horda
-        List<Enemy> toRemove = new ArrayList<>();
+        // Atualiza inimigos vivos
+        for (Enemy e : enemies) {
+            if (!e.isDead()) e.update(dt, playerX, playerY);
+        }
+
+        // Remove mortos e concede XP/kill ao jogador
         for (Enemy e : enemies) {
             if (e.isDead() && !e.isXpAwarded()) {
-                toRemove.add(e);
+                player.gainXP(e.getXpValue());
+                player.addKill();
                 killsThisHorda++;
+                e.markXpAwarded();
             }
         }
-        enemies.removeAll(toRemove);
         enemies.removeIf(Enemy::isDead);
-
-        for (Enemy e : enemies) e.update(dt, playerX, playerY);
 
         // Pausa entre hordas
         if (inBreak) {
@@ -68,7 +71,7 @@ public class EnemyManager {
             return;
         }
 
-        // Avanca horda se matou o suficiente
+        // Avança horda se matou o suficiente
         if (killsThisHorda >= killsToNextHorda) {
             killsThisHorda = 0;
             inBreak        = true;
@@ -91,17 +94,12 @@ public class EnemyManager {
         hordaNumber++;
         killsToNextHorda = killsRequired(hordaNumber);
 
-        // Mais inimigos simultaneos a cada 2 hordas
-        if (hordaNumber % 2 == 0) {
+        if (hordaNumber % 2 == 0)
             maxOnScreen = Math.min(maxOnScreen + 3, MAX_ON_SCREEN_CAP);
-        }
 
-        // Spawn mais rapido a cada 3 hordas
-        if (hordaNumber % 3 == 0) {
+        if (hordaNumber % 3 == 0)
             spawnInterval = Math.max(0.6f, spawnInterval - 0.2f);
-        }
 
-        // Notifica mudanca de tipo predominante
         int maxType = Math.min(4, (hordaNumber - 1) / 2);
         int newType = (hordaNumber - 1) % (maxType + 1);
         if (newType != lastHordaType) {
@@ -111,7 +109,7 @@ public class EnemyManager {
     }
 
     private void spawnBatch(float px, float py) {
-        int slots     = maxOnScreen - enemies.size();
+        int slots = maxOnScreen - enemies.size();
         if (slots <= 0) return;
         int batchSize = Math.min(slots, 1 + hordaNumber / 5);
         int maxType   = Math.min(4, (hordaNumber - 1) / 2);
@@ -152,5 +150,8 @@ public class EnemyManager {
         spawnInterval    = 2.0f;
         inBreak          = false;
         breakTimer       = 0f;
+    }
+    public void advanceHordaPublic() {
+        advanceHorda();
     }
 }

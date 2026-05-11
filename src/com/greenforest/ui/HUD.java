@@ -122,7 +122,7 @@ public class HUD {
     private void drawHordaProgress(Graphics2D g2,
                                    EnemyManager em, int screenW) {
         int cx = screenW / 2;
-        int y  = 42;
+        int y  = 62;
 
         if (em.isInBreak()) {
             // Contagem regressiva entre hordas

@@ -14,10 +14,7 @@ public class ProjectileManager {
     private final List<Projectile> projectiles = new ArrayList<>();
     private float attackTimer = 0f;
 
-    // Update
-    /**
-     * Modo AUTOMATICO: chame este metodo.
-     */
+
     public void update(float dt, Player player, List<Enemy> enemies) {
         attackTimer += dt;
 

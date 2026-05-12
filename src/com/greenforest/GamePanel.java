@@ -1,5 +1,7 @@
 package com.greenforest;
 
+import com.greenforest.AttackType;
+import com.greenforest.ScoreManager;
 import com.greenforest.entity.Boss;
 import com.greenforest.entity.Enemy;
 import com.greenforest.entity.Player;
@@ -40,6 +42,7 @@ public class GamePanel extends JPanel
 
     private int titlePhase    = 0;
     private int diffSelection = 1;
+    private int attackTypeSelection  = 0;
     private int modeSelection = 0;
     private int continueSelection = 0;
 
@@ -69,6 +72,19 @@ public class GamePanel extends JPanel
 
     // Game over lesson
     private String gameOverLesson = "";
+
+    // Score / placar
+    private long   finalScore       = 0L;
+    private long   displayedScore   = 0L;
+    private int    scoreRank        = -1;
+    private boolean enteringName    = false;
+    private StringBuilder playerName = new StringBuilder();
+    private boolean scoreSaved      = false;
+    private boolean showingScoreBoard = false;
+    private boolean isNewRecord     = false;
+
+    // Intro curta
+    private boolean showIntroStory  = true;
 
     // Crosswalk animation
     private float crosswalkTimer = 0f;
@@ -124,7 +140,7 @@ public class GamePanel extends JPanel
         generateBgBuildings();
         generateStreetElements();
 
-        if (SaveData.hasSave()) titlePhase = 2;
+        if (SaveData.hasSave()) titlePhase = 3;
     }
 
     private long lcg(long s) {
@@ -207,7 +223,18 @@ public class GamePanel extends JPanel
         manualMode        = modeSelection == 1;
 
         hud.setAttackMode(manualMode);
+        player.setAttackType(
+                attackTypeSelection == 1 ? AttackType.AREA : AttackType.PROJECTILE);
         enemyManager.setOnHordaChange(this::onHordaChange);
+
+        finalScore        = 0L;
+        displayedScore    = 0L;
+        scoreRank         = -1;
+        enteringName      = false;
+        playerName        = new StringBuilder();
+        scoreSaved        = false;
+        showingScoreBoard = false;
+        isNewRecord       = false;
 
         state = GameState.PLAYING;
     }
@@ -238,6 +265,8 @@ public class GamePanel extends JPanel
         for (int i = 1; i < d.hordaNumber; i++) enemyManager.advanceHordaPublic();
 
         hud.setAttackMode(manualMode);
+        player.setAttackType(
+                attackTypeSelection == 1 ? AttackType.AREA : AttackType.PROJECTILE);
         enemyManager.setOnHordaChange(this::onHordaChange);
 
         state = GameState.PLAYING;
@@ -264,6 +293,12 @@ public class GamePanel extends JPanel
 
     public void update(float dt) {
         tickCount++;
+
+        if (state == GameState.GAME_OVER && displayedScore < finalScore) {
+            long step = Math.max(25L, (finalScore - displayedScore) / 12L);
+            displayedScore = Math.min(finalScore, displayedScore + step);
+        }
+
         switch (state) {
             case PLAYING     -> updatePlaying(dt);
             case POWER_UP    -> updatePowerUp();
@@ -395,6 +430,17 @@ public class GamePanel extends JPanel
         if (player.isDead()) {
             SaveData.deleteSave();
             gameOverLesson = overlay.randomGameOverLesson();
+            finalScore = ScoreManager.calcScore(
+                    player.getKills(),
+                    enemyManager.getHordaNumber(),
+                    player.getLevel(),
+                    gameTimeSec);
+            displayedScore    = 0L;
+            isNewRecord       = ScoreManager.isHighScore(finalScore);
+            enteringName      = true;
+            scoreSaved        = false;
+            showingScoreBoard = false;
+            playerName        = new StringBuilder();
             state = GameState.GAME_OVER;
         }
 
@@ -934,21 +980,81 @@ public class GamePanel extends JPanel
 
         g2.setFont(new Font("Arial", Font.BOLD, 52));
         g2.setColor(new Color(80, 255, 80));
-        String title = "greenforest_";
+        String title = "greenforest";
         FontMetrics fm = g2.getFontMetrics();
-        g2.drawString(title, screenW / 2 - fm.stringWidth(title) / 2, 100);
+        g2.drawString(title, screenW / 2 - fm.stringWidth(title) / 2, 90);
 
         g2.setFont(new Font("Arial", Font.ITALIC, 16));
         g2.setColor(new Color(150, 220, 150));
         String sub = "Defenda a cidade do lixo urbano!";
         fm = g2.getFontMetrics();
-        g2.drawString(sub, screenW / 2 - fm.stringWidth(sub) / 2, 132);
+        g2.drawString(sub, screenW / 2 - fm.stringWidth(sub) / 2, 122);
+
+        long bestScore = ScoreManager.getBestScore();
+        if (bestScore > 0L) {
+            g2.setFont(new Font("Arial", Font.BOLD, 16));
+            g2.setColor(new Color(255, 220, 80));
+            String best = "Melhor score: " + formatScoreDisplay(bestScore);
+            fm = g2.getFontMetrics();
+            g2.drawString(best, screenW / 2 - fm.stringWidth(best) / 2, 152);
+        }
+
+        if (showIntroStory) {
+            drawIntroStory(g2);
+            return;
+        }
 
         switch (titlePhase) {
             case 0 -> drawTitleDifficulty(g2);
-            case 1 -> drawTitleMode(g2);
-            case 2 -> drawTitleContinue(g2);
+            case 1 -> drawTitleAttackType(g2);
+            case 2 -> drawTitleMode(g2);
+            case 3 -> drawTitleContinue(g2);
         }
+    }
+
+    private void drawIntroStory(Graphics2D g2) {
+        int cx = screenW / 2;
+        int boxW = 820;
+        int boxH = 250;
+        int bx = cx - boxW / 2;
+        int by = 190;
+
+        g2.setColor(new Color(0, 0, 0, 150));
+        g2.fillRoundRect(bx, by, boxW, boxH, 18, 18);
+
+        g2.setColor(new Color(80, 200, 80));
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRoundRect(bx, by, boxW, boxH, 18, 18);
+        g2.setStroke(new BasicStroke(1f));
+
+        g2.setFont(new Font("Arial", Font.BOLD, 24));
+        g2.setColor(new Color(210, 255, 210));
+        String title = "A ultima plantinha";
+        FontMetrics fm = g2.getFontMetrics();
+        g2.drawString(title, cx - fm.stringWidth(title) / 2, by + 42);
+
+        g2.setFont(new Font("Arial", Font.PLAIN, 18));
+        g2.setColor(new Color(200, 240, 200));
+
+        String[] lines = {
+                "No ultimo parque da cidade, restou apenas uma pequena plantinha viva.",
+                "O lixo mutante tomou conta da noite e criaturas poluentes surgiram do caos.",
+                "Agora ela precisa resistir e impedir que os monstros avancem para a cidade.",
+                "A defesa do parque e simbolica na historia, mas a batalha continua no mapa atual."
+        };
+
+        int y = by + 86;
+        for (String line : lines) {
+            fm = g2.getFontMetrics();
+            g2.drawString(line, cx - fm.stringWidth(line) / 2, y);
+            y += 34;
+        }
+
+        g2.setFont(new Font("Arial", Font.ITALIC, 15));
+        g2.setColor(new Color(150, 220, 150));
+        String hint = "ENTER para continuar";
+        fm = g2.getFontMetrics();
+        g2.drawString(hint, cx - fm.stringWidth(hint) / 2, by + boxH - 26);
     }
 
     private void drawTitleDifficulty(Graphics2D g2) {
@@ -966,14 +1072,45 @@ public class GamePanel extends JPanel
                 "Setas CIMA/BAIXO para selecionar  |  ENTER para confirmar");
     }
 
+    private void drawTitleAttackType(Graphics2D g2) {
+        drawTitleSection(g2, "TIPO DE ATAQUE:", 195);
+        drawTitleOption(g2,
+                "TIRO  --  Projeteis com alcance maior e foco em alvo",
+                250, attackTypeSelection == 0, new Color(100, 180, 255));
+        drawTitleOption(g2,
+                "AREA  --  Pulso curto ao redor do jogador",
+                310, attackTypeSelection == 1, new Color(80, 255, 130));
+
+        g2.setFont(new Font("Arial", Font.ITALIC, 14));
+        g2.setColor(new Color(160, 200, 160));
+        String desc = attackTypeSelection == 0
+                ? "Depois voce escolhe se os tiros serao automaticos ou manuais."
+                : "O ataque em area continua automatico e atinge inimigos proximos.";
+        FontMetrics fm = g2.getFontMetrics();
+        g2.drawString(desc, screenW / 2 - fm.stringWidth(desc) / 2, 360);
+
+        drawTitleHint(g2,
+                "Setas CIMA/BAIXO para selecionar  |  ENTER para confirmar");
+    }
+
     private void drawTitleMode(Graphics2D g2) {
-        drawTitleSection(g2, "MODO DE ATAQUE:", 195);
+        drawTitleSection(g2, "MODO DE DISPARO:", 195);
         drawTitleOption(g2,
-                "AUTOMATICO  --  Atira sozinho no inimigo mais proximo",
-                245, modeSelection == 0, new Color(80, 200, 255));
+                "AUTOMATICO  --  Tiros disparam sozinhos",
+                250, modeSelection == 0, new Color(80, 200, 255));
         drawTitleOption(g2,
-                "MANUAL  --  Aponte com o mouse e clique para atirar",
-                300, modeSelection == 1, new Color(255, 180, 80));
+                "MANUAL  --  Mire com o mouse e clique para atirar",
+                310, modeSelection == 1, new Color(255, 180, 80));
+
+        g2.setFont(new Font("Arial", Font.ITALIC, 13));
+        g2.setColor(new Color(120, 180, 120));
+        FontMetrics fm = g2.getFontMetrics();
+
+        String note = attackTypeSelection == 1
+                ? "Voce escolheu AREA: o pulso continua automatico neste modo."
+                : "Esta configuracao define como o TIRO sera usado durante a partida.";
+        g2.drawString(note, screenW / 2 - fm.stringWidth(note) / 2, 368);
+
         drawTitleHint(g2,
                 "Setas CIMA/BAIXO para selecionar  |  ENTER para comecar!");
     }
@@ -1039,28 +1176,45 @@ public class GamePanel extends JPanel
         g2.drawString(pauseTitle,
                 cx - fm.stringWidth(pauseTitle) / 2, 185);
 
+        String attackTypeName = player != null
+                ? (player.getAttackType() == AttackType.AREA ? "AREA" : "TIRO")
+                : "TIRO";
+        String modeName = manualMode ? "MANUAL" : "AUTO";
+
         String[] options = {
                 "Resumir",
                 "Salvar Jogo",
-                "Trocar Modo de Ataque  (" + (manualMode ? "MANUAL" : "AUTO") + ")",
+                "Trocar Tipo de Ataque: " + attackTypeName,
+                "Trocar Modo de Disparo: " + modeName,
                 "Voltar ao Menu"
         };
+
+        Color[] optColors = {
+                new Color(80,  255, 80),
+                new Color(80,  200, 255),
+                player != null && player.getAttackType() == AttackType.AREA
+                        ? new Color(80, 255, 130)
+                        : new Color(100, 180, 255),
+                manualMode
+                        ? new Color(255, 180, 80)
+                        : new Color(80,  200, 255),
+                new Color(255, 120, 120)
+        };
+
         for (int i = 0; i < options.length; i++) {
             boolean sel = pauseOption == i;
-            g2.setFont(new Font("Arial", Font.BOLD, sel ? 22 : 18));
-            g2.setColor(sel
-                    ? new Color(80, 255, 80)
-                    : new Color(160, 160, 160));
+            g2.setFont(new Font("Arial", Font.BOLD, sel ? 21 : 17));
+            g2.setColor(sel ? optColors[i] : new Color(160, 160, 160));
             fm = g2.getFontMetrics();
             String label = sel ? "> " + options[i] + " <" : options[i];
             g2.drawString(label,
-                    cx - fm.stringWidth(label) / 2, 262 + i * 52);
+                    cx - fm.stringWidth(label) / 2, 248 + i * 48);
         }
 
         g2.setFont(new Font("Arial", Font.ITALIC, 13));
         g2.setColor(new Color(120, 180, 120));
         String hint =
-                "CIMA/BAIXO para navegar  |  ENTER para confirmar  |  ESC para resumir";
+                "CIMA/BAIXO para navegar  |  ENTER para confirmar  |  ESC resumir";
         fm = g2.getFontMetrics();
         g2.drawString(hint,
                 cx - fm.stringWidth(hint) / 2, screenH - 40);
@@ -1081,56 +1235,187 @@ public class GamePanel extends JPanel
         g2.setColor(new Color(255, 60, 60));
         String go = "GAME OVER";
         FontMetrics fm = g2.getFontMetrics();
-        g2.drawString(go, cx - fm.stringWidth(go) / 2, 120);
+        g2.drawString(go, cx - fm.stringWidth(go) / 2, 100);
 
-        g2.setFont(new Font("Arial", Font.BOLD, 19));
+        // Stats
+        g2.setFont(new Font("Arial", Font.BOLD, 16));
         g2.setColor(Color.WHITE);
         String[] stats = {
                 "Nivel: "  + (player != null ? player.getLevel() : 0),
                 "Kills: "  + (player != null ? player.getKills() : 0),
+                "Horda: "  + (player != null ? enemyManager.getHordaNumber() : 1),
                 "Tempo: "  + String.format("%02d:%02d",
                         (int)(gameTimeSec / 60), (int)(gameTimeSec % 60))
         };
         for (int i = 0; i < stats.length; i++) {
             fm = g2.getFontMetrics();
             g2.drawString(stats[i],
-                    cx - fm.stringWidth(stats[i]) / 2, 175 + i * 30);
+                    cx - fm.stringWidth(stats[i]) / 2, 140 + i * 24);
         }
 
-        String[] lines = gameOverLesson.split("\n");
-        int padding = 22;
-        g2.setFont(new Font("Arial", Font.PLAIN, 15));
+        // Score final destaque
+        g2.setFont(new Font("Arial", Font.BOLD, 28));
+        String scoreStr = "SCORE: " + formatScoreDisplay(displayedScore);
         fm = g2.getFontMetrics();
-        int lineH = fm.getHeight() + 2;
-        int maxW  = 0;
-        for (String l : lines) maxW = Math.max(maxW, fm.stringWidth(l));
-        int boxW = maxW + padding * 2;
-        int boxH = lines.length * lineH + padding * 2;
-        int bx   = cx - boxW / 2;
-        int by   = 280;
+        g2.setColor(new Color(255, 220, 50));
+        g2.drawString(scoreStr, cx - fm.stringWidth(scoreStr) / 2, 250);
 
-        g2.setColor(new Color(30, 60, 30, 210));
-        g2.fillRoundRect(bx, by, boxW, boxH, 14, 14);
+        if (isNewRecord) {
+            g2.setFont(new Font("Arial", Font.BOLD, 17));
+            String nr = "NOVO RECORDE";
+            fm = g2.getFontMetrics();
+            int pulse = (int) (180 + 75 * Math.abs(Math.sin(tickCount * 0.12)));
+            g2.setColor(new Color(255, 255, 120, pulse));
+            g2.drawString(nr, cx - fm.stringWidth(nr) / 2, 276);
+        }
+
+        if (showingScoreBoard) {
+            drawScoreBoard(g2, cx);
+        } else if (enteringName) {
+            drawNameEntry(g2, cx);
+        } else {
+            drawGameOverHint(g2, cx);
+        }
+    }
+
+    private void drawNameEntry(Graphics2D g2, int cx) {
+        int by = 280;
+        FontMetrics fm;
+
+        g2.setFont(new Font("Arial", Font.BOLD, 18));
+        fm = g2.getFontMetrics();
+        String prompt = ScoreManager.isHighScore(finalScore)
+                ? "NOVO RECORDE! Digite seu nome:"
+                : "Digite seu nome para o placar:";
+        g2.setColor(new Color(255, 220, 80));
+        g2.drawString(prompt, cx - fm.stringWidth(prompt) / 2, by);
+
+        // Caixa de entrada
+        String name   = playerName.toString();
+        String cursor = (System.currentTimeMillis() / 500) % 2 == 0
+                ? "|" : " ";
+        String display = name + cursor;
+
+        g2.setFont(new Font("Monospaced", Font.BOLD, 26));
+        fm = g2.getFontMetrics();
+        int boxW = 260;
+        int boxH = 40;
+        int bx   = cx - boxW / 2;
+        int entryY = by + 20;
+
+        g2.setColor(new Color(20, 40, 20, 220));
+        g2.fillRoundRect(bx, entryY, boxW, boxH, 10, 10);
         g2.setColor(new Color(80, 200, 80));
         g2.setStroke(new BasicStroke(2f));
-        g2.drawRoundRect(bx, by, boxW, boxH, 14, 14);
+        g2.drawRoundRect(bx, entryY, boxW, boxH, 10, 10);
         g2.setStroke(new BasicStroke(1f));
 
-        g2.setColor(new Color(200, 255, 180));
-        for (int i = 0; i < lines.length; i++) {
-            fm = g2.getFontMetrics();
-            g2.drawString(lines[i],
-                    bx + padding,
-                    by + padding + fm.getAscent() + i * lineH);
+        g2.setColor(Color.WHITE);
+        g2.drawString(display,
+                cx - fm.stringWidth(display) / 2,
+                entryY + boxH - 10);
+
+        g2.setFont(new Font("Arial", Font.ITALIC, 13));
+        fm = g2.getFontMetrics();
+        g2.setColor(new Color(160, 200, 160));
+        String hint = "ENTER para confirmar  |  ESC para pular";
+        g2.drawString(hint, cx - fm.stringWidth(hint) / 2, entryY + boxH + 28);
+    }
+
+    private void drawScoreBoard(Graphics2D g2, int cx) {
+        java.util.List<ScoreManager.ScoreEntry> list = ScoreManager.load();
+        int by = 272;
+        FontMetrics fm;
+
+        g2.setFont(new Font("Arial", Font.BOLD, 18));
+        fm = g2.getFontMetrics();
+        String title = "-- PLACAR DE RECORDES --";
+        g2.setColor(new Color(255, 220, 50));
+        g2.drawString(title, cx - fm.stringWidth(title) / 2, by);
+
+        int rowH = 26;
+        int tableW = 420;
+        int tableH = Math.min(list.size(), ScoreManager.MAX_ENTRIES) * rowH + 16;
+        int bx = cx - tableW / 2;
+
+        g2.setColor(new Color(10, 30, 10, 210));
+        g2.fillRoundRect(bx, by + 8, tableW, tableH, 12, 12);
+        g2.setColor(new Color(60, 140, 60));
+        g2.setStroke(new BasicStroke(1.5f));
+        g2.drawRoundRect(bx, by + 8, tableW, tableH, 12, 12);
+        g2.setStroke(new BasicStroke(1f));
+
+        g2.setFont(new Font("Monospaced", Font.BOLD, 14));
+        fm = g2.getFontMetrics();
+
+        for (int i = 0; i < list.size()
+                && i < ScoreManager.MAX_ENTRIES; i++) {
+            ScoreManager.ScoreEntry e = list.get(i);
+            int ry = by + 8 + 12 + i * rowH;
+
+            // Destaque se for a entrada recém-adicionada
+            if (i == scoreRank) {
+                g2.setColor(new Color(255, 220, 50, 60));
+                g2.fillRoundRect(bx + 4, ry - 14,
+                        tableW - 8, rowH - 2, 6, 6);
+            }
+
+            Color rowColor;
+            if (i == scoreRank) {
+                rowColor = new Color(255, 255, 100);
+            } else if (i == 0) {
+                rowColor = new Color(255, 215, 80);
+            } else if (i == 1) {
+                rowColor = new Color(220, 220, 230);
+            } else if (i == 2) {
+                rowColor = new Color(210, 150, 90);
+            } else {
+                rowColor = new Color(160, 200, 160);
+            }
+
+            if (i >= 0 && i <= 2) {
+                Color bg;
+                if (i == 0) bg = new Color(255, 215, 80, 32);
+                else if (i == 1) bg = new Color(220, 220, 230, 28);
+                else bg = new Color(210, 150, 90, 28);
+
+                g2.setColor(bg);
+                g2.fillRoundRect(bx + 4, ry - 14,
+                        tableW - 8, rowH - 2, 6, 6);
+            }
+
+            g2.setColor(rowColor);
+            String rank  = String.format("%2d.", i + 1);
+            String nName = e.name.length() > 10
+                    ? e.name.substring(0, 10) : e.name;
+            String sc    = formatScoreDisplay(e.score);
+            String extra = "kills: " + e.kills + "  horda: " + e.horda;
+
+            String row = String.format(
+                    "%-3s %-10s %8s  %s",
+                    rank, nName, sc, extra);
+            g2.drawString(row, bx + 12, ry);
         }
 
-        g2.setFont(new Font("Arial", Font.BOLD, 16));
+        drawGameOverHint(g2, cx);
+    }
+
+    private void drawGameOverHint(Graphics2D g2, int cx) {
+        g2.setFont(new Font("Arial", Font.BOLD, 15));
+        FontMetrics fm = g2.getFontMetrics();
         g2.setColor(new Color(150, 255, 150));
-        String restartHint =
-                "R  --  Jogar novamente     |     M  --  Menu principal";
-        fm = g2.getFontMetrics();
-        g2.drawString(restartHint,
-                cx - fm.stringWidth(restartHint) / 2, by + boxH + 48);
+        String hint = showingScoreBoard
+                ? "R -- Jogar novamente     |     M -- Menu principal"
+                : "R -- Jogar novamente  |  T -- Ver placar  |  M -- Menu";
+        g2.drawString(hint,
+                cx - fm.stringWidth(hint) / 2, screenH - 35);
+    }
+
+    private String formatScoreDisplay(long score) {
+        if (score < 1_000L)      return String.valueOf(score);
+        if (score < 1_000_000L)  return String.format("%,d", score)
+                .replace(',', '.');
+        return String.format("%.1fM", score / 1_000_000.0);
     }
 
     @Override
@@ -1150,18 +1435,32 @@ public class GamePanel extends JPanel
                 }
             }
             case GAME_OVER -> {
-                if (k == KeyEvent.VK_R) {
-                    titlePhase = 0;
-                    startGame();
-                } else if (k == KeyEvent.VK_M) {
-                    titlePhase = SaveData.hasSave() ? 2 : 0;
-                    state = GameState.TITLE;
+                if (enteringName) {
+                    handleNameEntryKey(k, e);
+                } else {
+                    if (k == KeyEvent.VK_R) {
+                        titlePhase = 0;
+                        startGame();
+                    } else if (k == KeyEvent.VK_T) {
+                        showingScoreBoard = true;
+                    } else if (k == KeyEvent.VK_M) {
+                        titlePhase = SaveData.hasSave() ? 3 : 0;
+                        showIntroStory = false;
+                        state = GameState.TITLE;
+                    }
                 }
             }
         }
     }
 
     private void handleTitleKey(int k) {
+        if (showIntroStory) {
+            if (k == KeyEvent.VK_ENTER || k == KeyEvent.VK_SPACE) {
+                showIntroStory = false;
+            }
+            return;
+        }
+
         switch (titlePhase) {
             case 0 -> { // dificuldade
                 if (k == KeyEvent.VK_UP)
@@ -1177,14 +1476,21 @@ public class GamePanel extends JPanel
                     titlePhase = 1;
                 }
             }
-            case 1 -> { // modo de ataque
+            case 1 -> { // tipo de ataque
+                if (k == KeyEvent.VK_UP)
+                    attackTypeSelection = Math.max(0, attackTypeSelection - 1);
+                if (k == KeyEvent.VK_DOWN)
+                    attackTypeSelection = Math.min(1, attackTypeSelection + 1);
+                if (k == KeyEvent.VK_ENTER) titlePhase = 2;
+            }
+            case 2 -> { // modo de disparo
                 if (k == KeyEvent.VK_UP)
                     modeSelection = Math.max(0, modeSelection - 1);
                 if (k == KeyEvent.VK_DOWN)
                     modeSelection = Math.min(1, modeSelection + 1);
                 if (k == KeyEvent.VK_ENTER) startGame();
             }
-            case 2 -> { // continuar ou novo jogo
+            case 3 -> { // continuar ou novo jogo
                 if (k == KeyEvent.VK_UP)
                     continueSelection = Math.max(0, continueSelection - 1);
                 if (k == KeyEvent.VK_DOWN)
@@ -1193,7 +1499,7 @@ public class GamePanel extends JPanel
                     if (continueSelection == 0) {
                         continueGame();
                     } else {
-                        // Novo jogo: escolhe dificuldade normalmente
+                        // Novo jogo: vai para dificuldade
                         SaveData.deleteSave();
                         titlePhase = 0;
                     }
@@ -1214,26 +1520,34 @@ public class GamePanel extends JPanel
         if (k == KeyEvent.VK_UP)
             pauseOption = Math.max(0, pauseOption - 1);
         if (k == KeyEvent.VK_DOWN)
-            pauseOption = Math.min(3, pauseOption + 1); // agora tem 4 opcoes
+            pauseOption = Math.min(4, pauseOption + 1);
         if (k == KeyEvent.VK_ENTER) {
             switch (pauseOption) {
                 case 0 -> state = GameState.PLAYING;
                 case 1 -> {
-                    // Salvar jogo
                     boolean ok = saveGame();
-                    // Exibe feedback breve (reusa overlay de horda)
                     overlay.showHordaMessage(ok
                             ? "Jogo salvo com sucesso!"
                             : "Erro ao salvar o jogo.");
                     state = GameState.PLAYING;
                 }
                 case 2 -> {
+                    // Trocar tipo de ataque
+                    if (player != null) {
+                        player.toggleAttackType();
+                        attackTypeSelection =
+                                player.getAttackType() == AttackType.AREA ? 1 : 0;
+                    }
+                    state = GameState.PLAYING;
+                }
+                case 3 -> {
+                    // Trocar modo de disparo
                     manualMode = !manualMode;
                     hud.setAttackMode(manualMode);
                     state = GameState.PLAYING;
                 }
-                case 3 -> {
-                    titlePhase = SaveData.hasSave() ? 2 : 0;
+                case 4 -> {
+                    titlePhase = SaveData.hasSave() ? 3 : 0;
                     state = GameState.TITLE;
                 }
             }
@@ -1244,6 +1558,36 @@ public class GamePanel extends JPanel
         if (k == KeyEvent.VK_LEFT)  powerUpScreen.moveLeft();
         if (k == KeyEvent.VK_RIGHT) powerUpScreen.moveRight();
         if (k == KeyEvent.VK_ENTER) powerUpScreen.confirm();
+    }
+
+    private void handleNameEntryKey(int k, KeyEvent e) {
+        if (k == KeyEvent.VK_ENTER) {
+            String name = playerName.toString().trim();
+            if (name.isEmpty()) name = "???";
+            scoreRank = ScoreManager.submitScore(
+                    name, finalScore,
+                    player != null ? player.getKills() : 0,
+                    enemyManager != null ? enemyManager.getHordaNumber() : 1,
+                    player != null ? player.getLevel() : 1,
+                    gameTimeSec);
+            scoreSaved        = true;
+            enteringName      = false;
+            showingScoreBoard = true;
+            showIntroStory    = false;
+        } else if (k == KeyEvent.VK_ESCAPE) {
+            enteringName     = false;
+            showingScoreBoard = false;
+        } else if (k == KeyEvent.VK_BACK_SPACE) {
+            if (playerName.length() > 0)
+                playerName.deleteCharAt(playerName.length() - 1);
+        } else {
+            char c = e.getKeyChar();
+            if (c != KeyEvent.CHAR_UNDEFINED
+                    && !Character.isISOControl(c)
+                    && playerName.length() < 12) {
+                playerName.append(Character.toUpperCase(c));
+            }
+        }
     }
 
     @Override

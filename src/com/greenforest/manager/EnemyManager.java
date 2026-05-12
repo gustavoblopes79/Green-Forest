@@ -11,45 +11,36 @@ import java.util.function.Consumer;
 
 public class EnemyManager {
 
-    private static final int   TOTAL_TYPES        = 10;
-    private static final int   MAX_ON_SCREEN_CAP  = 50;
-    private static final float BREAK_DURATION     = 3.0f;
+    private static final int   TOTAL_TYPES       = 10;
+    private static final int   MAX_ON_SCREEN_CAP = 42;
+    private static final float BREAK_DURATION    = 3.0f;
 
     private static final int[][] SPAWN_WEIGHTS = {
-            // H1:  só SACOLA e CIGARRO com trace de LATA
             { 50, 10,  0,  0, 30,  0,  0, 10,  0,  0 },
-            // H2:  SACOLA domina, CIGARRO e ISOPOR entram forte
             { 40,  8,  0,  5, 25,  0,  0, 22,  0,  0 },
-            // H3:  LATA cresce, NUVEM aparece, ISOPOR presente
             { 30, 20,  0, 10, 20,  0,  0, 18,  2,  0 },
-            // H4:  GARRAFA entra, LATA cresce mais
             { 22, 22,  5, 12, 15, 14,  0, 10,  0,  0 },
-            // H5:  PNEU entra, mistura boa de 5 tipos
             { 18, 18, 12, 12, 12, 14,  0, 10,  4,  0 },
-            // H6:  AGROTOX cresce, OLEO aparece
             { 14, 16, 12, 12, 10, 12,  8,  8,  8,  0 },
-            // H7:  OLEO cresce, ENTULHO aparece
             { 12, 14, 12, 10,  8, 12, 12,  8,  8,  4 },
-            // H8:  ENTULHO mais presente, todos ativos
             { 10, 12, 12, 10,  8, 10, 12,  8, 10,  8 },
-            // H9:  tanques dominam mais
             {  8, 10, 14,  8,  6, 10, 14,  6, 12, 12 },
-            // H10+: distribuicao mista pesando tanques e especiais
             {  8,  8, 14,  8,  6, 10, 14,  6, 14, 12 },
     };
 
     private final List<Enemy> enemies = new ArrayList<>();
 
-    private int   hordaNumber      = 1;
-    private int   killsThisHorda   = 0;
-    private int   killsToNextHorda = 15;
-    private int   maxOnScreen      = 10;
+    private int   hordaNumber          = 1;
+    private int   killsThisHorda       = 0;
+    private int   killsToNextHorda     = totalEnemiesForHorda(1);
+    private int   inimigosSpawnados    = 0;
+    private int   maxOnScreen          = maxOnScreenForHorda(1);
 
-    private float spawnTimer    = 0f;
-    private float spawnInterval = 1.6f; // mais agressivo no inicio
+    private float spawnTimer           = 0f;
+    private float spawnInterval        = spawnIntervalForHorda(1);
 
-    private boolean inBreak    = false;
-    private float   breakTimer = 0f;
+    private boolean inBreak            = false;
+    private float   breakTimer         = 0f;
 
     private int lastHordaType = -1;
     private Consumer<Integer> onHordaChange;
@@ -59,8 +50,27 @@ public class EnemyManager {
     }
 
     public static int killsRequired(int horda) {
-        if (horda == 1) return 15;
-        return killsRequired(horda - 1) + 10 + (horda - 2) * 5;
+        return totalEnemiesForHorda(horda);
+    }
+
+    private static int totalEnemiesForHorda(int horda) {
+        if (horda <= 1) return 15;
+        if (horda == 2) return 22;
+        if (horda == 3) return 30;
+        if (horda == 4) return 40;
+        return Math.min(40 + (horda - 4) * 10, 120);
+    }
+
+    private static int maxOnScreenForHorda(int horda) {
+        return Math.min(12 + (horda - 1) * 3, MAX_ON_SCREEN_CAP);
+    }
+
+    private static float spawnIntervalForHorda(int horda) {
+        return Math.max(0.20f, 0.50f - (horda - 1) * 0.04f);
+    }
+
+    private int batchSizeForHorda() {
+        return Math.min(2 + (hordaNumber - 1) / 2, 5);
     }
 
     public void update(float dt, float playerX, float playerY,
@@ -88,18 +98,51 @@ public class EnemyManager {
             return;
         }
 
-        if (killsThisHorda >= killsToNextHorda) {
-            killsThisHorda = 0;
-            inBreak        = true;
-            breakTimer     = BREAK_DURATION;
+        // --- pulso de area ---
+        if (player.pollAreaPulse()) {
+            applyAreaDamage(player.getX(), player.getY(),
+                    player.getAreaRadius(), player.getAreaDamage(), player);
+        }
+
+        boolean hordaTotalSpawnada = inimigosSpawnados >= killsToNextHorda;
+        boolean hordaFoiConcluida = hordaTotalSpawnada
+                && killsThisHorda >= killsToNextHorda
+                && enemies.isEmpty();
+
+        if (hordaFoiConcluida) {
+            inBreak    = true;
+            breakTimer = BREAK_DURATION;
+            spawnTimer = 0f;
             return;
         }
 
+        if (hordaTotalSpawnada) return;
+
         spawnTimer += dt;
-        float effectiveInterval = spawnInterval * DifficultySettings.spawnIntervalMult();
-        if (spawnTimer >= effectiveInterval && enemies.size() < maxOnScreen) {
+        float effectiveInterval =
+                spawnInterval * DifficultySettings.spawnIntervalMult();
+
+        if (spawnTimer >= effectiveInterval
+                && enemies.size() < maxOnScreen) {
             spawnTimer = 0f;
             spawnBatch(playerX, playerY);
+        }
+    }
+
+    /**
+     * Aplica dano em area em todos os inimigos dentro do raio.
+     * Contabiliza kills pelo mesmo fluxo do update normal.
+     */
+    public void applyAreaDamage(float cx, float cy, float radius,
+                                float damage, Player player) {
+        for (Enemy e : enemies) {
+            if (e.isDead()) continue;
+            float dx   = e.getX() - cx;
+            float dy   = e.getY() - cy;
+            float dist = (float) Math.sqrt(dx * dx + dy * dy);
+            if (dist <= radius) {
+                e.takeDamage((int) damage);
+            }
         }
     }
 
@@ -111,27 +154,28 @@ public class EnemyManager {
         int slots = maxOnScreen - enemies.size();
         if (slots <= 0) return;
 
-        // Batch cresce com hordas: 1-2 no inicio, ate 4 nas altas
-        int batchSize = Math.min(slots, 1 + Math.min(hordaNumber / 3, 3));
+        int faltandoNaHorda = killsToNextHorda - inimigosSpawnados;
+        if (faltandoNaHorda <= 0) return;
+
+        int batchSize = Math.min(slots, batchSizeForHorda());
+        batchSize = Math.min(batchSize, faltandoNaHorda);
 
         for (int i = 0; i < batchSize; i++) {
-            int type = pickType();
-
+            int   type   = pickType();
             float angle  = (float)(Math.random() * Math.PI * 2);
             float radius = 340f + (float)(Math.random() * 160f);
-            float ex     = px + (float)Math.cos(angle) * radius;
-            float ey     = py + (float)Math.sin(angle) * radius;
+            float ex     = px + (float) Math.cos(angle) * radius;
+            float ey     = py + (float) Math.sin(angle) * radius;
             enemies.add(new Enemy(ex, ey, type));
+            inimigosSpawnados++;
         }
     }
 
     private int pickType() {
         int row = Math.min(hordaNumber - 1, SPAWN_WEIGHTS.length - 1);
         int[] weights = SPAWN_WEIGHTS[row];
-
         int total = 0;
         for (int w : weights) total += w;
-
         int roll = (int)(Math.random() * total);
         int acc  = 0;
         for (int t = 0; t < TOTAL_TYPES; t++) {
@@ -143,17 +187,12 @@ public class EnemyManager {
 
     private void advanceHorda() {
         hordaNumber++;
-        killsToNextHorda = killsRequired(hordaNumber);
+        killsThisHorda    = 0;
+        inimigosSpawnados = 0;
+        killsToNextHorda  = totalEnemiesForHorda(hordaNumber);
+        maxOnScreen       = maxOnScreenForHorda(hordaNumber);
+        spawnInterval     = spawnIntervalForHorda(hordaNumber);
 
-        // Mais inimigos na tela a cada 2 hordas
-        if (hordaNumber % 2 == 0)
-            maxOnScreen = Math.min(maxOnScreen + 3, MAX_ON_SCREEN_CAP);
-
-        // Spawn mais rapido a cada 3 hordas
-        if (hordaNumber % 3 == 0)
-            spawnInterval = Math.max(0.5f, spawnInterval - 0.15f);
-
-        // Notifica qual tipo sera dominante nesta horda (pico da tabela)
         int row       = Math.min(hordaNumber - 1, SPAWN_WEIGHTS.length - 1);
         int dominant  = 0;
         int maxWeight = 0;
@@ -181,13 +220,16 @@ public class EnemyManager {
         lastHordaType    = -1;
         hordaNumber      = 1;
         killsThisHorda   = 0;
-        killsToNextHorda = 15;
-        maxOnScreen      = 10;
+        killsToNextHorda = totalEnemiesForHorda(1);
+        inimigosSpawnados = 0;
+        maxOnScreen      = maxOnScreenForHorda(1);
         spawnTimer       = 0f;
-        spawnInterval    = 1.6f;
+        spawnInterval    = spawnIntervalForHorda(1);
         inBreak          = false;
         breakTimer       = 0f;
     }
 
-    public void advanceHordaPublic() { advanceHorda(); }
+    public void advanceHordaPublic() {
+        advanceHorda();
+    }
 }

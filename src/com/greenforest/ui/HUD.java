@@ -1,6 +1,8 @@
 package com.greenforest.ui;
 
+import com.greenforest.AttackType;
 import com.greenforest.DifficultySettings;
+import com.greenforest.ScoreManager;
 import com.greenforest.entity.Player;
 import com.greenforest.manager.EnemyManager;
 
@@ -32,6 +34,10 @@ public class HUD {
 
     private String attackModeLabel = "AUTO";
 
+    // Score display pulse
+    private long  lastScore     = 0L;
+    private float scorePulse    = 0f;
+
     public void setAttackMode(boolean manual) {
         attackModeLabel = manual ? "MANUAL" : "AUTO";
     }
@@ -42,6 +48,8 @@ public class HUD {
             tipTimer = 0f;
             tipIndex = (tipIndex + 1) % TIPS.length;
         }
+        if (scorePulse > 0f) scorePulse -= dt * 3f;
+        if (scorePulse < 0f) scorePulse = 0f;
     }
 
     public void draw(Graphics2D g2, int screenW, int screenH,
@@ -70,6 +78,9 @@ public class HUD {
         g2.setColor(new Color(200, 200, 200));
         g2.drawString("Kills: " + player.getKills(), 12, statsY + 16);
 
+        drawAttackTypeWidget(g2, player, statsY + 36);
+
+        // Timer central
         int mins = (int)(gameTimeSec / 60);
         int secs = (int)(gameTimeSec % 60);
         String timeStr = String.format("%02d:%02d", mins, secs);
@@ -83,9 +94,23 @@ public class HUD {
 
         g2.setFont(new Font("Arial", Font.BOLD, 11));
         g2.setColor(new Color(160, 240, 160));
-        String infoStr = DifficultySettings.label() + "  |  " + attackModeLabel;
+        String infoStr = DifficultySettings.label()
+                + "  |  " + attackModeLabel;
         fm = g2.getFontMetrics();
-        g2.drawString(infoStr, screenW - fm.stringWidth(infoStr) - 12, 18);
+        g2.drawString(infoStr,
+                screenW - fm.stringWidth(infoStr) - 12, 18);
+
+        // Score no canto superior direito
+        long currentScore = ScoreManager.calcScore(
+                player.getKills(),
+                em.getHordaNumber(),
+                player.getLevel(),
+                gameTimeSec);
+        if (currentScore != lastScore) {
+            scorePulse = 1f;
+            lastScore  = currentScore;
+        }
+        drawScoreWidget(g2, screenW, currentScore);
 
         drawHordaProgress(g2, em, screenW);
 
@@ -98,14 +123,128 @@ public class HUD {
                 fm = g2.getFontMetrics();
                 String warn = "!! BOSS SE APROXIMA !!";
                 int wx = screenW / 2 - fm.stringWidth(warn) / 2;
+                int wy = 98;
                 g2.setColor(new Color(0, 0, 0, 160));
-                g2.drawString(warn, wx + 1, 57);
+                g2.drawString(warn, wx + 1, wy + 1);
                 g2.setColor(new Color(255, 70, 70));
-                g2.drawString(warn, wx, 56);
+                g2.drawString(warn, wx, wy);
             }
         }
 
         drawTicker(g2, screenW, screenH);
+    }
+
+    private void drawScoreWidget(Graphics2D g2, int screenW, long score) {
+        String scoreStr = formatScore(score);
+        String label    = "SCORE";
+
+        float pulse = scorePulse;
+        int   alpha = (int)(180 + pulse * 75);
+        alpha = Math.min(255, alpha);
+        float scale = 1f + pulse * 0.12f;
+
+        g2.setFont(new Font("Arial", Font.BOLD, 11));
+        FontMetrics fmL = g2.getFontMetrics();
+        g2.setFont(new Font("Arial", Font.BOLD, 20));
+        FontMetrics fmS = g2.getFontMetrics();
+
+        int scoreW = fmS.stringWidth(scoreStr);
+        int labelW = fmL.stringWidth(label);
+        int boxW   = Math.max(scoreW, labelW) + 24;
+        int boxH   = 42;
+        int bx     = screenW - boxW - 10;
+        int by     = 28;
+
+        // fundo
+        g2.setColor(new Color(0, 0, 0, 150));
+        g2.fillRoundRect(bx, by, boxW, boxH, 10, 10);
+        g2.setColor(new Color(255, 220, 50, (int)(pulse * 120)));
+        g2.setStroke(new BasicStroke(1.5f));
+        g2.drawRoundRect(bx, by, boxW, boxH, 10, 10);
+        g2.setStroke(new BasicStroke(1f));
+
+        // label "SCORE"
+        g2.setFont(new Font("Arial", Font.BOLD, 11));
+        fmL = g2.getFontMetrics();
+        g2.setColor(new Color(200, 200, 200, alpha));
+        g2.drawString(label,
+                bx + boxW / 2 - fmL.stringWidth(label) / 2,
+                by + 15);
+
+        // valor com pulse de cor
+        Color scoreColor;
+        if (pulse > 0.5f) {
+            scoreColor = new Color(255, 255, 80, alpha);
+        } else {
+            scoreColor = new Color(255, 220, 50, alpha);
+        }
+        g2.setFont(new Font("Arial", Font.BOLD, 20));
+        fmS = g2.getFontMetrics();
+        g2.setColor(new Color(0, 0, 0, 120));
+        g2.drawString(scoreStr,
+                bx + boxW / 2 - fmS.stringWidth(scoreStr) / 2 + 1,
+                by + 36);
+        g2.setColor(scoreColor);
+        g2.drawString(scoreStr,
+                bx + boxW / 2 - fmS.stringWidth(scoreStr) / 2,
+                by + 35);
+    }
+
+    private String formatScore(long score) {
+        if (score < 1_000L)       return String.valueOf(score);
+        if (score < 1_000_000L)   return String.format("%,d", score)
+                .replace(',', '.');
+        return String.format("%.1fM", score / 1_000_000.0);
+    }
+
+    private void drawAttackTypeWidget(Graphics2D g2, Player player, int y) {
+        boolean isArea = player.getAttackType() == AttackType.AREA;
+
+        g2.setFont(new Font("Arial", Font.BOLD, 12));
+        FontMetrics fm = g2.getFontMetrics();
+
+        String typeLabel = isArea ? "[AREA]" : "[TIRO]";
+        Color  typeColor = isArea
+                ? new Color(80, 255, 130)
+                : new Color(100, 180, 255);
+
+        int lw = fm.stringWidth(typeLabel) + 10;
+        g2.setColor(new Color(0, 0, 0, 120));
+        g2.fillRoundRect(10, y - 13, lw, 17, 6, 6);
+
+        g2.setColor(typeColor);
+        g2.drawString(typeLabel, 15, y);
+
+        if (isArea) {
+            float coolRatio  = player.getAreaCooldownRatio();
+            float readyRatio = 1f - coolRatio;
+            int barW = 70;
+            int barH = 5;
+            int bx   = 15;
+            int by   = y + 16;
+
+            g2.setColor(new Color(20, 40, 20, 180));
+            g2.fillRoundRect(bx, by, barW, barH, 3, 3);
+
+            if (readyRatio > 0f) {
+                Color barColor = readyRatio >= 1f
+                        ? new Color(80, 255, 120)
+                        : new Color(60, 180, 80);
+                g2.setColor(barColor);
+                g2.fillRoundRect(bx, by,
+                        (int)(barW * readyRatio), barH, 3, 3);
+            }
+
+            g2.setColor(new Color(80, 160, 80, 180));
+            g2.setStroke(new BasicStroke(1f));
+            g2.drawRoundRect(bx, by, barW, barH, 3, 3);
+
+            if (coolRatio <= 0f) {
+                g2.setFont(new Font("Arial", Font.BOLD, 10));
+                g2.setColor(new Color(120, 255, 120));
+                g2.drawString("PRONTO", bx + barW + 4, by + barH);
+            }
+        }
     }
 
     private void drawTicker(Graphics2D g2, int screenW, int screenH) {
@@ -114,7 +253,6 @@ public class HUD {
 
         g2.setColor(new Color(0, 0, 0, 165));
         g2.fillRect(0, barY, screenW, barH);
-
         g2.setColor(new Color(60, 120, 60, 200));
         g2.setStroke(new BasicStroke(1f));
         g2.drawLine(0, barY, screenW, barY);
@@ -125,30 +263,31 @@ public class HUD {
         String prefix = "  Eco: ";
         String tip    = TIPS[tipIndex];
 
-        // Progresso de fade entre dicas
         float progress = tipTimer / TIP_INTERVAL;
         int alpha;
-        if (progress < 0.1f)       alpha = (int)(progress / 0.1f * 255);
-        else if (progress > 0.85f) alpha = (int)((1f - (progress - 0.85f) / 0.15f) * 255);
-        else                       alpha = 255;
+        if (progress < 0.1f)        alpha = (int)(progress / 0.1f * 255);
+        else if (progress > 0.85f)  alpha = (int)((1f - (progress - 0.85f)
+                / 0.15f) * 255);
+        else                        alpha = 255;
         alpha = Math.max(0, Math.min(255, alpha));
 
         int textY = barY + barH - 7;
 
         g2.setColor(new Color(80, 180, 80, Math.min(alpha, 200)));
         g2.drawString(prefix, 4, textY);
-
         int prefixW = fm.stringWidth(prefix);
         g2.setColor(new Color(200, 255, 190, alpha));
         g2.drawString(tip, 4 + prefixW, textY);
     }
 
-    private void drawHordaProgress(Graphics2D g2, EnemyManager em, int screenW) {
+    private void drawHordaProgress(Graphics2D g2,
+                                   EnemyManager em, int screenW) {
         int cx = screenW / 2;
         int y  = 62;
 
         if (em.isInBreak()) {
-            String msg = "PROXIMA HORDA EM " + (int) Math.ceil(em.getBreakTimer()) + "s...";
+            String msg = "PROXIMA HORDA EM "
+                    + (int) Math.ceil(em.getBreakTimer()) + "s...";
             g2.setFont(new Font("Arial", Font.BOLD, 13));
             FontMetrics fm = g2.getFontMetrics();
             int ttx = cx - fm.stringWidth(msg) / 2;
@@ -191,9 +330,11 @@ public class HUD {
                 + "/" + em.getKillsToNextHorda() + " kills";
 
         g2.setColor(new Color(0, 0, 0, 140));
-        g2.drawString(hordaStr, cx - fm.stringWidth(hordaStr) / 2 + 1, by - 1);
+        g2.drawString(hordaStr,
+                cx - fm.stringWidth(hordaStr) / 2 + 1, by - 1);
         g2.setColor(new Color(180, 255, 180));
-        g2.drawString(hordaStr, cx - fm.stringWidth(hordaStr) / 2, by - 2);
+        g2.drawString(hordaStr,
+                cx - fm.stringWidth(hordaStr) / 2, by - 2);
 
         g2.setColor(new Color(0, 0, 0, 140));
         g2.drawString(killsStr,
@@ -207,7 +348,6 @@ public class HUD {
                          float ratio, Color fill, Color bg, String label) {
         g2.setColor(bg);
         g2.fillRoundRect(x, y, w, h, 7, 7);
-
         int fw = (int)(w * Math.max(0f, Math.min(1f, ratio)));
         if (fw > 0) {
             g2.setColor(fill);
@@ -215,11 +355,9 @@ public class HUD {
             g2.setColor(new Color(255, 255, 255, 55));
             g2.fillRoundRect(x, y, fw, h / 2, 7, 7);
         }
-
         g2.setColor(new Color(255, 255, 255, 70));
         g2.setStroke(new BasicStroke(1f));
         g2.drawRoundRect(x, y, w, h, 7, 7);
-
         g2.setFont(new Font("Arial", Font.BOLD, Math.max(9, h - 5)));
         g2.setColor(Color.WHITE);
         g2.drawString(label, x + 5, y + h - 3);

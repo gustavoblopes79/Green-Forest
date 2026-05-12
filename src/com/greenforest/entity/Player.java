@@ -1,12 +1,12 @@
 package com.greenforest.entity;
 
+import com.greenforest.AttackType;
 import com.greenforest.powerup.PowerUp;
 
 import java.awt.*;
 
 public class Player extends Entity {
 
-    // level / XP
     // level / XP
     private int level         = 1;
     private int xp            = 0;
@@ -22,11 +22,11 @@ public class Player extends Entity {
     // power-up: multiplicadores
     private float damageMult    = 1f;
     private float speedMult     = 1f;
-    private float fireRateMult  = 1f;   // >1 = atira mais rapido
-    private int   extraShots    = 0;    // projéteis extras por tiro
-    private int   vampHeal      = 0;    // HP recuperado ao matar inimigo
-    private int   shield        = 0;    // HP do escudo atual
-    private int   maxShield     = 0;    // HP maximo do escudo
+    private float fireRateMult  = 1f;
+    private int   extraShots    = 0;
+    private int   vampHeal      = 0;
+    private int   shield        = 0;
+    private int   maxShield     = 0;
 
     // i-frames
     private float iFrameTimer = 0f;
@@ -36,6 +36,21 @@ public class Player extends Entity {
     private float aimDirX  = 1f, aimDirY = 0f;
     private float animTimer = 0f;
 
+    // --- ataque em area ---
+    private AttackType attackType = AttackType.PROJECTILE;
+
+    // cooldown do pulso: dispara a cada AREA_COOLDOWN segundos
+    private static final float AREA_COOLDOWN   = 1.8f;
+    // raio base do pulso (pixels world)
+    private static final float AREA_RADIUS     = 140f;
+    // dano base do pulso (multiplicado por damageMult)
+    private static final float AREA_DAMAGE_BASE = 35f;
+
+    private float areaCooldownTimer = 0f;  // contador regressivo
+    // para animacao visual: tempo desde o ultimo pulso (GamePanel usa isso)
+    private float areaPulseAnim = -1f;     // -1 = sem pulso ativo
+    private static final float PULSE_ANIM_DURATION = 0.35f;
+
     public Player(float x, float y) {
         super(x, y, 100, 26);
     }
@@ -44,10 +59,72 @@ public class Player extends Entity {
     public void update(float dt, float playerX, float playerY) {
         animTimer += dt;
         if (iFrameTimer > 0f) iFrameTimer -= dt;
+
+        // cooldown de area
+        if (attackType == AttackType.AREA) {
+            if (areaCooldownTimer > 0f) {
+                areaCooldownTimer -= dt;
+            }
+        }
+
+        // animacao de pulso (decai independente do modo)
+        if (areaPulseAnim >= 0f) {
+            areaPulseAnim += dt;
+            if (areaPulseAnim > PULSE_ANIM_DURATION) areaPulseAnim = -1f;
+        }
+    }
+
+    /**
+     * Retorna true se o pulso de area deve ser disparado agora.
+     * O EnemyManager chama este metodo e, se retornar true, aplica o dano.
+     * Reseta o timer automaticamente.
+     */
+    public boolean pollAreaPulse() {
+        if (attackType != AttackType.AREA) return false;
+        if (areaCooldownTimer <= 0f) {
+            areaCooldownTimer = AREA_COOLDOWN;
+            areaPulseAnim = 0f;    // inicia animacao
+            return true;
+        }
+        return false;
+    }
+
+    public float getAreaRadius()  { return AREA_RADIUS; }
+    public float getAreaDamage()  { return AREA_DAMAGE_BASE * damageMult; }
+
+    /**
+     * Retorna o progresso da animacao do pulso entre 0.0 e 1.0,
+     * ou -1 se nenhum pulso esta sendo animado.
+     */
+    public float getAreaPulseProgress() {
+        if (areaPulseAnim < 0f) return -1f;
+        return areaPulseAnim / PULSE_ANIM_DURATION;
+    }
+
+    /**
+     * Retorna o ratio do cooldown (0 = pronto, 1 = recarregando).
+     */
+    public float getAreaCooldownRatio() {
+        if (attackType != AttackType.AREA) return 0f;
+        return Math.max(0f, Math.min(1f, areaCooldownTimer / AREA_COOLDOWN));
+    }
+
+    public AttackType getAttackType() { return attackType; }
+
+    public void setAttackType(AttackType t) {
+        this.attackType = t;
+        // ao trocar, reseta o timer para o jogador nao ter pulso imediato
+        if (t == AttackType.AREA) areaCooldownTimer = AREA_COOLDOWN * 0.5f;
+    }
+
+    public void toggleAttackType() {
+        setAttackType(attackType == AttackType.PROJECTILE
+                ? AttackType.AREA
+                : AttackType.PROJECTILE);
     }
 
     public void move(float dx, float dy, float worldW, float worldH) {
-        float spd = speedMult;   // multiplicador aplicado em GamePanel
+        float spd = speedMult;
         x = Math.max(size / 2f,
                 Math.min(worldW - size / 2f, x + dx * spd));
         y = Math.max(size / 2f,
@@ -57,8 +134,6 @@ public class Player extends Entity {
     @Override
     public void takeDamage(int dmg) {
         if (iFrameTimer > 0f) return;
-
-        // escudo absorve primeiro
         if (shield > 0) {
             int absorbed = Math.min(shield, dmg);
             shield -= absorbed;
@@ -83,7 +158,6 @@ public class Player extends Entity {
     }
 
     public boolean isLevelUpPending() { return levelUpPending; }
-
     public void clearLevelUpPending() { levelUpPending = false; }
 
     public void applyPowerUp(PowerUp pu) {
@@ -108,7 +182,6 @@ public class Player extends Entity {
 
     public void addKill() { onKill(); }
 
-
     public void setAimDirection(float dx, float dy) {
         float len = (float) Math.sqrt(dx * dx + dy * dy);
         if (len > 0) { aimDirX = dx / len; aimDirY = dy / len; }
@@ -126,6 +199,9 @@ public class Player extends Entity {
         // Piscar durante i-frames
         if (iFrameTimer > 0f && (int)(iFrameTimer * 10) % 2 == 0) return;
 
+        // Aura de area (desenhada atras do sprite)
+        drawAreaAura(g2, sx, sy);
+
         drawPlant(g2, sx, sy);
 
         // Anel de escudo
@@ -137,6 +213,57 @@ public class Player extends Entity {
             g2.drawOval(sx - size / 2 - 6, sy - size / 2 - 6,
                     size + 12, size + 12);
             g2.setStroke(new BasicStroke(1f));
+        }
+    }
+
+    private void drawAreaAura(Graphics2D g2, int sx, int sy) {
+        if (attackType != AttackType.AREA) return;
+
+        int r = (int) AREA_RADIUS;
+
+        // Anel estatico de alcance (tenue)
+        Composite old = g2.getComposite();
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.18f));
+        g2.setColor(new Color(120, 255, 120));
+        g2.setStroke(new BasicStroke(1.5f));
+        g2.drawOval(sx - r, sy - r, r * 2, r * 2);
+        g2.setStroke(new BasicStroke(1f));
+        g2.setComposite(old);
+
+        // Barra de cooldown em arco (circulo ao redor do jogador)
+        float coolRatio = 1f - getAreaCooldownRatio(); // 0=recarregando, 1=pronto
+        if (coolRatio < 1f) {
+            g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, 0.55f));
+            g2.setColor(new Color(80, 220, 80));
+            g2.setStroke(new BasicStroke(3f));
+            int arcR = size / 2 + 10;
+            int arcAngle = (int)(360 * coolRatio);
+            g2.drawArc(sx - arcR, sy - arcR, arcR * 2, arcR * 2,
+                    90, arcAngle);
+            g2.setStroke(new BasicStroke(1f));
+            g2.setComposite(old);
+        }
+
+        // Animacao de pulso: onda se expandindo
+        float pulse = getAreaPulseProgress();
+        if (pulse >= 0f) {
+            float pr = pulse; // 0..1
+            int   pr_pixels = (int)(pr * r);
+            int   alphaVal  = (int)(200 * (1f - pr));
+            g2.setComposite(AlphaComposite.getInstance(
+                    AlphaComposite.SRC_OVER, alphaVal / 255f));
+            g2.setColor(new Color(140, 255, 140));
+            g2.setStroke(new BasicStroke(3f - pr * 2f));
+            g2.drawOval(sx - pr_pixels, sy - pr_pixels,
+                    pr_pixels * 2, pr_pixels * 2);
+            // preenchimento suave
+            g2.setComposite(AlphaComposite.getInstance(
+                    AlphaComposite.SRC_OVER, alphaVal / 600f));
+            g2.setColor(new Color(180, 255, 160));
+            g2.fillOval(sx - pr_pixels, sy - pr_pixels,
+                    pr_pixels * 2, pr_pixels * 2);
+            g2.setStroke(new BasicStroke(1f));
+            g2.setComposite(old);
         }
     }
 

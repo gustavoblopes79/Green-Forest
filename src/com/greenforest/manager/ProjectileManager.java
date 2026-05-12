@@ -1,5 +1,6 @@
 package com.greenforest.manager;
 
+import com.greenforest.AttackType;
 import com.greenforest.entity.Boss;
 import com.greenforest.entity.Enemy;
 import com.greenforest.entity.Player;
@@ -14,64 +15,53 @@ public class ProjectileManager {
     private final List<Projectile> projectiles = new ArrayList<>();
     private float attackTimer = 0f;
 
-    /**
-     * Modo automatico: prioriza o boss se houver um ativo.
-     * Passa boss = null quando nao houver boss.
-     */
-    public void update(float dt, Player player, List<Enemy> enemies, Boss boss) {
-        attackTimer += dt;
 
+    public void update(float dt, Player player,
+                       List<Enemy> enemies, Boss boss) {
+        // Modo AREA: apenas avanca os projeteis existentes, nao gera novos
+        if (player.getAttackType() == AttackType.AREA) {
+            tickProjectiles();
+            return;
+        }
+
+        attackTimer += dt;
         if (attackTimer >= 1f / player.getAttackSpeed()) {
             attackTimer = 0f;
-
-            // Prioridade 1: boss ativo
             if (boss != null && !boss.isDead()) {
                 float dx  = boss.getX() - player.getX();
                 float dy  = boss.getY() - player.getY();
                 float len = (float) Math.sqrt(dx * dx + dy * dy);
-                if (len > 0) {
-                    fireProjectile(player, dx / len, dy / len);
-                }
+                if (len > 0) fireProjectile(player, dx / len, dy / len);
             } else {
-                // Prioridade 2: inimigo mais proximo
                 Enemy nearest = findNearest(player, enemies);
                 if (nearest != null) {
                     float dx  = nearest.getX() - player.getX();
                     float dy  = nearest.getY() - player.getY();
                     float len = (float) Math.sqrt(dx * dx + dy * dy);
-                    if (len > 0) {
-                        fireProjectile(player, dx / len, dy / len);
-                    }
+                    if (len > 0) fireProjectile(player, dx / len, dy / len);
                 }
             }
         }
-
         tickProjectiles();
     }
 
-    /**
-     * Sobrecarga de compatibilidade sem boss (delega para a versao principal).
-     */
+    /** Sobrecarga de compatibilidade sem boss. */
     public void update(float dt, Player player, List<Enemy> enemies) {
         update(dt, player, enemies, null);
     }
 
-    /**
-     * Modo MANUAL: chame este metodo (sem auto-fire).
-     * O disparo real acontece via manualFire().
-     */
+    /** Modo MANUAL: tick sem auto-fire. */
     public void updateManual(float dt) {
         tickProjectiles();
     }
 
-    /**
-     * Disparo manual acionado pelo clique do mouse ou ESPACO.
-     */
+    /** Disparo manual acionado pelo clique. */
     public void manualFire(Player player) {
+        // No modo AREA o clique nao dispara projeteis
+        if (player.getAttackType() == AttackType.AREA) return;
         fireProjectile(player, player.getAimDirX(), player.getAimDirY());
     }
 
-    // Internal
     private void fireProjectile(Player player, float dirX, float dirY) {
         projectiles.add(new Projectile(
                 player.getX(), player.getY(),
@@ -93,15 +83,11 @@ public class ProjectileManager {
             float dx = e.getX() - player.getX();
             float dy = e.getY() - player.getY();
             float d  = dx * dx + dy * dy;
-            if (d < minDist) {
-                minDist = d;
-                nearest = e;
-            }
+            if (d < minDist) { minDist = d; nearest = e; }
         }
         return nearest;
     }
 
-    // Colisao com inimigos normais
     public void checkCollisions(List<Enemy> enemies, Player player) {
         for (Projectile p : projectiles) {
             if (p.isDead()) continue;
@@ -119,7 +105,6 @@ public class ProjectileManager {
         }
     }
 
-    // Colisao com boss
     public void checkCollisionsWithBoss(Boss boss, Player player) {
         if (boss == null || boss.isDead()) return;
         for (Projectile p : projectiles) {
@@ -135,7 +120,6 @@ public class ProjectileManager {
         }
     }
 
-    // Draw
     public void draw(Graphics2D g2, int camX, int camY) {
         for (Projectile p : projectiles) p.draw(g2, camX, camY);
     }

@@ -364,6 +364,27 @@ public class GamePanel extends JPanel
 
         enemyManager.update(dt, player.getX(), player.getY(), gameTimeSec, player);
 
+        if (player.pollAreaPulse()) {
+            enemyManager.applyAreaDamage(
+                    player.getX(),
+                    player.getY(),
+                    player.getAreaRadius(),
+                    player.getAreaDamage(),
+                    player);
+
+            if (bossManager.hasBoss()) {
+                Boss boss = bossManager.getActiveBoss();
+                float dxBoss = boss.getX() - player.getX();
+                float dyBoss = boss.getY() - player.getY();
+                float distBoss = (float)Math.sqrt(dxBoss * dxBoss + dyBoss * dyBoss);
+                float hitRadius = player.getAreaRadius() + boss.getSize() / 2f;
+
+                if (distBoss <= hitRadius) {
+                    boss.takeDamage((int) player.getAreaDamage());
+                }
+            }
+        }
+
         // Level up pendente
         // Level up pendente
         if (player.isLevelUpPending()) {

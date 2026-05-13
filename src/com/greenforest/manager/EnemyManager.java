@@ -103,10 +103,7 @@ public class EnemyManager {
             return;
         }
 
-        if (player.pollAreaPulse()) {
-            applyAreaDamage(player.getX(), player.getY(),
-                    player.getAreaRadius(), player.getAreaDamage(), player);
-        }
+
 
         boolean hordaTotalSpawnada = inimigosSpawnados >= killsToNextHorda;
         boolean hordaFoiConcluida = hordaTotalSpawnada

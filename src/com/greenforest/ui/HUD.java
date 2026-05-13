@@ -11,20 +11,20 @@ import java.awt.*;
 public class HUD {
 
     private static final String[] TIPS = {
-            "Separe o lixo reciclavel: papel, plastico, vidro e metal",
-            "Nunca jogue bituca de cigarro no chao: ela contem microplasticos",
-            "Pneus velhos acumulam agua parada e propagam dengue",
-            "Lata de aluminio reciclada economiza 95% de energia",
-            "Sacolas plasticas levam ate 400 anos para se decompor",
-            "Prefira embalagens retornaveis e biodegradaveis",
-            "Pilhas e baterias contem metais pesados: descarte correto!",
-            "O Brasil gera 80 milhoes de toneladas de residuos por ano",
-            "Apenas 4% do lixo brasileiro e reciclado. Voce pode mudar isso!",
-            "Oleo de cozinha usado contamina ate 1 milhao de litros de agua",
-            "Isopor nao e reciclado pela maioria das cooperativas",
-            "Agrotoxicos contaminam o solo por decadas",
+            "Separe o lixo reciclável: papel, plástico, vidro e metal",
+            "Nunca jogue bituca de cigarro no chão: ela contém microplásticos",
+            "Pneus velhos acumulam água parada e propagam dengue",
+            "Lata de alumínio reciclada economiza 95% de energia",
+            "Sacolas plásticas levam até 400 anos para se decompor",
+            "Prefira embalagens retornáveis e biodegradáveis",
+            "Pilhas e baterias contém metais pesados: descarte corretamente!",
+            "O Brasil gera 80 milhões de toneladas de resíduos por ano",
+            "Apenas 4% do lixo brasileiro é reciclado. Você pode mudar isso!",
+            "òleo de cozinha usado contamina até 1 milhão de litros de água",
+            "Isopor não é reciclado pela maioria das cooperativas",
+            "Agrotóxicos contaminam o solo por décadas",
             "Entulho descartado incorretamente causa enchentes",
-            "Microplasticos ja foram encontrados no sangue humano",
+            "Microplásticos já foram encontrados no sangue humano",
             "Desmatamento destruiu 20% da Amazonia original"
     };
 

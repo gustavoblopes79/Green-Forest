@@ -9,15 +9,15 @@ public class EducationalOverlay {
     private static final float HORDA_DURATION = 4.5f;
 
     private static final String[] HORDA_LESSONS = {
-            /* horda 1  */ "HORDA 1: SACOLAS PLASTICAS\nUm brasileiro usa em media 45 sacolas plasticas por mes.\nSubstitua por sacolas reutilizaveis!",
-            /* horda 2  */ "HORDA 2: LATAS DE ALUMINIO\nO aluminio pode ser reciclado infinitas vezes.\nReciclar gasta 95% menos energia que produzir do zero!",
-            /* horda 3  */ "HORDA 3: PNEUS DESCARTADOS\nPneus levam ate 600 anos para se decompor.\nAcumulam agua parada e aumentam o risco de dengue!",
-            /* horda 4  */ "HORDA 4: NUVEM TOXICA\nA poluicao do ar causa asma, bronquite e cancer de pulmao.\nPrefira transporte publico, bicicleta ou caminhada!",
-            /* horda 5  */ "HORDA 5: CIGARROS\nO filtro do cigarro contem microplasticos e celulosa de acetato.\nE o item mais coletado em limpezas de praias no mundo!",
-            /* horda 6  */ "HORDA 6: GARRAFAS PLASTICAS\nGarrafas PET levam ate 450 anos para se decompor.\nPrefira garrafas reutilizaveis de inox ou vidro!",
-            /* horda 7  */ "HORDA 7: OLEO RESIDUAL\nUm litro de oleo de cozinha contamina ate 1 milhao de litros de agua.\nDescarte em postos de coleta de oleo!",
-            /* horda 8  */ "HORDA 8: ISOPOR\nIsopor (EPS) demora mais de 400 anos para se decompor.\nA maioria das cooperativas nao recicla isopor!",
-            /* horda 9  */ "HORDA 9: AGROTOXICOS\nO Brasil e o maior consumidor de agrotoxicos do mundo.\nContaminam solo, rios e chegam a sua mesa!",
+            /* horda 1  */ "HORDA 1: SACOLAS PLÁSTICAS\nUm brasileiro usa em média 45 sacolas plásticas por mês.\nSubstitua por sacolas reutilizáveis!",
+            /* horda 2  */ "HORDA 2: LATAS DE ALUMÍNIO\nO alumínio pode ser reciclado infinitas vezes.\nReciclar gasta 95% menos energia que produzir do zero!",
+            /* horda 3  */ "HORDA 3: PNEUS DESCARTADOS\nPneus levam até 600 anos para se decompor.\nAcumulam água parada e aumentam o risco de dengue!",
+            /* horda 4  */ "HORDA 4: NUVEM TÓXICA\nA poluição do ar causa asma, bronquite e câncer de pulmão.\nPrefira transporte público, bicicleta ou caminhada!",
+            /* horda 5  */ "HORDA 5: CIGARROS\nO filtro do cigarro contém microplásticos e celulosa de acetato.\nE o item mais coletado em limpezas de praias no mundo!",
+            /* horda 6  */ "HORDA 6: GARRAFAS PLÁSTICAS\nGarrafas PET levam até 450 anos para se decompor.\nPrefira garrafas reutilizáveis de inox ou vidro!",
+            /* horda 7  */ "HORDA 7: ÓLEO RESIDUAL\nUm litro de óleo de cozinha contamina até 1 milhão de litros de agua.\nDescarte em postos de coleta de óleo!",
+            /* horda 8  */ "HORDA 8: ISOPOR\nIsopor (EPS) demora mais de 400 anos para se decompor.\nA maioria das cooperativas não recicla isopor!",
+            /* horda 9  */ "HORDA 9: AGROTÓXICOS\nO Brasil é o maior consumidor de agrotóxicos do mundo.\nContaminam solo, rios e chegam à sua mesa!",
             /* horda 10 */ "HORDA 10: ENTULHO\nO entulho responde por mais de 50% do lixo urbano do Brasil.\nDescarte apenas em ecopontos e cacarecas licenciadas!"
     };
 

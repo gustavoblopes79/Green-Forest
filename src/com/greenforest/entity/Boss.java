@@ -137,29 +137,29 @@ public class Boss extends Enemy {
     private static String buildLesson(BossType t) {
         return switch (t) {
             case E_WASTE ->
-                    "O lixo eletronico e o residuo que mais cresce no mundo.\n" +
-                            "Celulares e computadores contem metais toxicos como\n" +
-                            "chumbo e mercurio. Descarte nos pontos especializados!";
+                    "O lixo eletrônico é o resíduo que mais cresce no mundo.\n" +
+                            "Celulares e computadores contém metais tóxicos como\n" +
+                            "chumbo e mercúrio. Descarte nos pontos especializados!";
             case FACTORY ->
-                    "Fabricas sem controle lancam CO2 e SO2 na atmosfera,\n" +
-                            "causando chuva acida e aquecimento global.\n" +
-                            "Exija politicas de emissao zero e setores sustentaveis!";
+                    "Fábricas sem controle lançam CO2 e SO2 na atmosfera,\n" +
+                            "causando chuva ácida e aquecimento global.\n" +
+                            "Exija políticas de emissão zero e setores sustentáveis!";
             case GARBAGE_TRUCK ->
-                    "O Brasil gera mais de 80 milhoes de toneladas de\n" +
-                            "residuos por ano. Apenas 4% e reciclado.\n" +
+                    "O Brasil gera mais de 80 milhões de toneladas de\n" +
+                            "resíduos por ano. Apenas 4% é reciclado.\n" +
                             "Separe o lixo e apoie a coleta seletiva no seu bairro!";
             case PETROLEO ->
-                    "Derramamentos de petroleo destroem ecossistemas marinhos\n" +
-                            "e costeiros por decadas. Um litro de oleo contamina\n" +
-                            "1 milhao de litros de agua. Reduza o uso de combustiveis!";
+                    "Derramamentos de petróleo destroem ecossistemas marinhos\n" +
+                            "e costeiros por décadas. Um litro de óleo contamina\n" +
+                            "1 milhão de litros de água. Reduza o uso de combustíveis!";
             case DESMATAMENTO ->
-                    "O Brasil perdeu mais de 20% da Amazonia. O desmatamento\n" +
-                            "libera carbono, destroi habitats e seca rios.\n" +
-                            "Consuma produtos certificados e denuncia o desmate ilegal!";
+                    "O Brasil perdeu mais de 20% da Amazônia. O desmatamento\n" +
+                            "libera carbono, destrói habitats e seca rios.\n" +
+                            "Consuma produtos certificados e denuncie o desmatamento ilegal!";
             case PLASTICO_OCEANO ->
-                    "8 milhoes de toneladas de plastico entram nos oceanos\n" +
-                            "todo ano. Microplasticos ja foram encontrados no sangue\n" +
-                            "humano. Reduza, reutilize e recicle o plastico!";
+                    "8 milhões de toneladas de plástico entram nos oceanos\n" +
+                            "todo ano. Microplásticos já foram encontrados no sangue\n" +
+                            "humano. Reduza, reutilize e recicle o plástico!";
         };
     }
 
@@ -503,12 +503,12 @@ public class Boss extends Enemy {
 
     private String bossTypeLabel() {
         return switch (bossType) {
-            case E_WASTE         -> "LIXO ELETRONICO";
-            case FACTORY         -> "FABRICA POLUENTE";
-            case GARBAGE_TRUCK   -> "CAMINHAO DE LIXO";
-            case PETROLEO        -> "DERRAMAMENTO DE PETROLEO";
+            case E_WASTE         -> "LIXO ELETRÔNICO";
+            case FACTORY         -> "FÁBRICA POLUENTE";
+            case GARBAGE_TRUCK   -> "CAMINHÃO DE LIXO";
+            case PETROLEO        -> "DERRAMAMENTO DE PETRÓLEO";
             case DESMATAMENTO    -> "MOTOSSERRA DO DESMATE";
-            case PLASTICO_OCEANO -> "ILHA DE PLASTICO";
+            case PLASTICO_OCEANO -> "ILHA DE PLÁSTICO";
         };
     }
 

@@ -437,12 +437,12 @@ public class GamePanel extends JPanel
             player.addKill();
             pendingBossLesson = deadBoss.getLesson();
             pendingBossName = switch (deadBoss.getBossType()) {
-                case E_WASTE        -> "LIXO ELETRONICO";
-                case FACTORY        -> "FABRICA POLUENTE";
-                case GARBAGE_TRUCK  -> "CAMINHAO DE LIXO";
-                case PETROLEO       -> "PETROLEO";
+                case E_WASTE        -> "LIXO ELETRÔNICO";
+                case FACTORY        -> "FÁBRICA POLUENTE";
+                case GARBAGE_TRUCK  -> "CAMINHÃO DE LIXO";
+                case PETROLEO       -> "PETRÓLEO";
                 case DESMATAMENTO   -> "DESMATAMENTO";
-                case PLASTICO_OCEANO -> "PLASTICO OCEANO";
+                case PLASTICO_OCEANO -> "PLÁSTICO OCEÂNICO";
             };
             state = GameState.BOSS_LESSON;
         }

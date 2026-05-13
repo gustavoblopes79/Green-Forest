@@ -30,17 +30,17 @@ public class EnemyManager {
 
     private final List<Enemy> enemies = new ArrayList<>();
 
-    private int   hordaNumber          = 1;
-    private int   killsThisHorda       = 0;
-    private int   killsToNextHorda     = totalEnemiesForHorda(1);
-    private int   inimigosSpawnados    = 0;
-    private int   maxOnScreen          = maxOnScreenForHorda(1);
+    private int   hordaNumber       = 1;
+    private int   killsThisHorda    = 0;
+    private int   killsToNextHorda  = totalEnemiesForHorda(1);
+    private int   inimigosSpawnados = 0;
+    private int   maxOnScreen       = maxOnScreenForHorda(1);
 
-    private float spawnTimer           = 0f;
-    private float spawnInterval        = spawnIntervalForHorda(1);
+    private float spawnTimer        = 0f;
+    private float spawnInterval     = spawnIntervalForHorda(1);
 
-    private boolean inBreak            = false;
-    private float   breakTimer         = 0f;
+    private boolean inBreak         = false;
+    private float   breakTimer      = 0f;
 
     private int lastHordaType = -1;
     private Consumer<Integer> onHordaChange;
@@ -89,6 +89,11 @@ public class EnemyManager {
         }
         enemies.removeIf(Enemy::isDead);
 
+        if (player.hasScreenClearReady()) {
+            clearAllEnemiesOnScreen(player);
+            player.consumeScreenClear();
+        }
+
         if (inBreak) {
             breakTimer -= dt;
             if (breakTimer <= 0f) {
@@ -98,7 +103,6 @@ public class EnemyManager {
             return;
         }
 
-        // --- pulso de area ---
         if (player.pollAreaPulse()) {
             applyAreaDamage(player.getX(), player.getY(),
                     player.getAreaRadius(), player.getAreaDamage(), player);
@@ -129,10 +133,6 @@ public class EnemyManager {
         }
     }
 
-    /**
-     * Aplica dano em area em todos os inimigos dentro do raio.
-     * Contabiliza kills pelo mesmo fluxo do update normal.
-     */
     public void applyAreaDamage(float cx, float cy, float radius,
                                 float damage, Player player) {
         for (Enemy e : enemies) {
@@ -142,6 +142,14 @@ public class EnemyManager {
             float dist = (float) Math.sqrt(dx * dx + dy * dy);
             if (dist <= radius) {
                 e.takeDamage((int) damage);
+            }
+        }
+    }
+
+    private void clearAllEnemiesOnScreen(Player player) {
+        for (Enemy e : enemies) {
+            if (!e.isDead()) {
+                e.takeDamage(999999);
             }
         }
     }
@@ -164,8 +172,8 @@ public class EnemyManager {
             int   type   = pickType();
             float angle  = (float)(Math.random() * Math.PI * 2);
             float radius = 340f + (float)(Math.random() * 160f);
-            float ex     = px + (float) Math.cos(angle) * radius;
-            float ey     = py + (float) Math.sin(angle) * radius;
+            float ex     = px + (float)Math.cos(angle) * radius;
+            float ey     = py + (float)Math.sin(angle) * radius;
             enemies.add(new Enemy(ex, ey, type));
             inimigosSpawnados++;
         }
@@ -209,24 +217,24 @@ public class EnemyManager {
     }
 
     public List<Enemy> getEnemies()          { return enemies; }
-    public int         getHordaNumber()      { return hordaNumber; }
-    public int         getKillsThisHorda()   { return killsThisHorda; }
-    public int         getKillsToNextHorda() { return killsToNextHorda; }
-    public boolean     isInBreak()           { return inBreak; }
-    public float       getBreakTimer()       { return breakTimer; }
+    public int getHordaNumber()              { return hordaNumber; }
+    public int getKillsThisHorda()           { return killsThisHorda; }
+    public int getKillsToNextHorda()         { return killsToNextHorda; }
+    public boolean isInBreak()               { return inBreak; }
+    public float getBreakTimer()             { return breakTimer; }
 
     public void clear() {
         enemies.clear();
-        lastHordaType    = -1;
-        hordaNumber      = 1;
-        killsThisHorda   = 0;
-        killsToNextHorda = totalEnemiesForHorda(1);
+        lastHordaType     = -1;
+        hordaNumber       = 1;
+        killsThisHorda    = 0;
+        killsToNextHorda  = totalEnemiesForHorda(1);
         inimigosSpawnados = 0;
-        maxOnScreen      = maxOnScreenForHorda(1);
-        spawnTimer       = 0f;
-        spawnInterval    = spawnIntervalForHorda(1);
-        inBreak          = false;
-        breakTimer       = 0f;
+        maxOnScreen       = maxOnScreenForHorda(1);
+        spawnTimer        = 0f;
+        spawnInterval     = spawnIntervalForHorda(1);
+        inBreak           = false;
+        breakTimer        = 0f;
     }
 
     public void advanceHordaPublic() {

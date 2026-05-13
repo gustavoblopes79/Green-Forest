@@ -37,6 +37,7 @@ public class HUD {
     // Score display pulse
     private long  lastScore     = 0L;
     private float scorePulse    = 0f;
+    private float screenClearMsgTimer = 0f;
 
     public void setAttackMode(boolean manual) {
         attackModeLabel = manual ? "MANUAL" : "AUTO";
@@ -50,6 +51,9 @@ public class HUD {
         }
         if (scorePulse > 0f) scorePulse -= dt * 3f;
         if (scorePulse < 0f) scorePulse = 0f;
+
+        if (screenClearMsgTimer > 0f) screenClearMsgTimer -= dt;
+        if (screenClearMsgTimer < 0f) screenClearMsgTimer = 0f;
     }
 
     public void draw(Graphics2D g2, int screenW, int screenH,
@@ -78,6 +82,10 @@ public class HUD {
         g2.setColor(new Color(200, 200, 200));
         g2.drawString("Kills: " + player.getKills(), 12, statsY + 16);
 
+        if (player.pollScreenClearTriggered()) {
+            screenClearMsgTimer = 2.0f;
+        }
+
         drawAttackTypeWidget(g2, player, statsY + 36);
 
         // Timer central
@@ -101,11 +109,10 @@ public class HUD {
                 screenW - fm.stringWidth(infoStr) - 12, 18);
 
         // Score no canto superior direito
-        long currentScore = ScoreManager.calcScore(
+        long currentScore = ScoreManager.calcRunScore(
                 player.getKills(),
                 em.getHordaNumber(),
-                player.getLevel(),
-                gameTimeSec);
+                player.getLevel());
         if (currentScore != lastScore) {
             scorePulse = 1f;
             lastScore  = currentScore;
@@ -113,6 +120,7 @@ public class HUD {
         drawScoreWidget(g2, screenW, currentScore);
 
         drawHordaProgress(g2, em, screenW);
+        drawScreenClearMessage(g2, screenW);
 
         if (bossImminent) {
             long t        = System.currentTimeMillis();
@@ -245,6 +253,39 @@ public class HUD {
                 g2.drawString("PRONTO", bx + barW + 4, by + barH);
             }
         }
+    }
+
+
+    private void drawScreenClearMessage(Graphics2D g2, int screenW) {
+        if (screenClearMsgTimer <= 0f) return;
+
+        float total = 2.0f;
+        float t = screenClearMsgTimer / total;
+        if (t < 0f) t = 0f;
+        if (t > 1f) t = 1f;
+
+        float pulse = (float)Math.abs(Math.sin(System.currentTimeMillis() * 0.012));
+        int alpha = (int)(140 + 115 * t);
+        int y = 124;
+
+        String text = "LIMPEZA DE TELA";
+        g2.setFont(new Font("Arial", Font.BOLD, 26));
+        FontMetrics fm = g2.getFontMetrics();
+        int x = screenW / 2 - fm.stringWidth(text) / 2;
+
+        g2.setColor(new Color(0, 0, 0, Math.min(180, alpha)));
+        g2.fillRoundRect(x - 18, y - 28, fm.stringWidth(text) + 36, 38, 12, 12);
+
+        g2.setColor(new Color(255, 220, 80, (int)(110 + 90 * pulse)));
+        g2.setStroke(new BasicStroke(2f));
+        g2.drawRoundRect(x - 18, y - 28, fm.stringWidth(text) + 36, 38, 12, 12);
+        g2.setStroke(new BasicStroke(1f));
+
+        g2.setColor(new Color(0, 0, 0, Math.min(170, alpha)));
+        g2.drawString(text, x + 2, y + 2);
+
+        g2.setColor(new Color(255, 240, 120, alpha));
+        g2.drawString(text, x, y);
     }
 
     private void drawTicker(Graphics2D g2, int screenW, int screenH) {

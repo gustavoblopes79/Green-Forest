@@ -430,11 +430,11 @@ public class GamePanel extends JPanel
         if (player.isDead()) {
             SaveData.deleteSave();
             gameOverLesson = overlay.randomGameOverLesson();
-            finalScore = ScoreManager.calcScore(
+            finalScore = ScoreManager.calcRunScore(
                     player.getKills(),
                     enemyManager.getHordaNumber(),
-                    player.getLevel(),
-                    gameTimeSec);
+                    player.getLevel())
+                    + ScoreManager.calcTimeBonus(gameTimeSec);
             displayedScore    = 0L;
             isNewRecord       = ScoreManager.isHighScore(finalScore);
             enteringName      = true;
@@ -1029,7 +1029,7 @@ public class GamePanel extends JPanel
 
         g2.setFont(new Font("Arial", Font.BOLD, 24));
         g2.setColor(new Color(210, 255, 210));
-        String title = "A ultima plantinha";
+        String title = "A última plantinha";
         FontMetrics fm = g2.getFontMetrics();
         g2.drawString(title, cx - fm.stringWidth(title) / 2, by + 42);
 
@@ -1037,10 +1037,9 @@ public class GamePanel extends JPanel
         g2.setColor(new Color(200, 240, 200));
 
         String[] lines = {
-                "No ultimo parque da cidade, restou apenas uma pequena plantinha viva.",
+                "No último parque da cidade, restou apenas uma pequena plantinha viva.",
                 "O lixo mutante tomou conta da noite e criaturas poluentes surgiram do caos.",
-                "Agora ela precisa resistir e impedir que os monstros avancem para a cidade.",
-                "A defesa do parque e simbolica na historia, mas a batalha continua no mapa atual."
+                "Agora ela precisa resistir e impedir que os monstros tomem a cidade.",
         };
 
         int y = by + 86;
@@ -1260,11 +1259,11 @@ public class GamePanel extends JPanel
         g2.setColor(new Color(255, 220, 50));
         g2.drawString(scoreStr, cx - fm.stringWidth(scoreStr) / 2, 250);
 
-        if (isNewRecord) {
+        if (isNewRecord && !enteringName) {
             g2.setFont(new Font("Arial", Font.BOLD, 17));
             String nr = "NOVO RECORDE";
             fm = g2.getFontMetrics();
-            int pulse = (int) (180 + 75 * Math.abs(Math.sin(tickCount * 0.12)));
+            int pulse = (int)(180 + 75 * Math.abs(Math.sin(tickCount * 0.12)));
             g2.setColor(new Color(255, 255, 120, pulse));
             g2.drawString(nr, cx - fm.stringWidth(nr) / 2, 276);
         }

@@ -36,10 +36,20 @@ public class ScoreManager {
 
     public static long calcScore(int kills, int horda,
                                  int level, float timeSec) {
-        long base       = kills * 100L;
+        return calcRunScore(kills, horda, level)
+                + calcTimeBonus(timeSec);
+    }
+
+    public static long calcRunScore(int kills, int horda, int level) {
+        long killScore  = kills * 100L;
         long hordaBonus = Math.max(0, horda - 1) * 500L;
         long levelBonus = Math.max(0, level - 1) * 300L;
-        return base + hordaBonus + levelBonus;
+        return killScore + hordaBonus + levelBonus;
+    }
+
+    public static long calcTimeBonus(float timeSec) {
+        long minutes = (long)(timeSec / 60f);
+        return minutes * 120L;
     }
 
     @SuppressWarnings("unchecked")
